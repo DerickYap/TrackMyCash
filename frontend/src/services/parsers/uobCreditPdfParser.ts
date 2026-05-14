@@ -17,6 +17,8 @@ const TX_RE = new RegExp(
 const SKIP_PREFIXES = [
   'previous balance', 'sub total', 'total balance', 'ref no',
   'end of transaction', 'statement date', 'page ',
+  'payment received', 'payment - thank you', 'autopay', 'auto pay',
+  'minimum payment', 'new balance', 'credit limit',
 ];
 
 function inferYear(lines: string[]): number {

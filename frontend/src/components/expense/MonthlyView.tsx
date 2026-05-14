@@ -27,7 +27,10 @@ export function MonthlyView({ transactions }: Props) {
   const debits = monthTransactions.filter(t => t.type === 'debit');
   const credits = monthTransactions.filter(t => t.type === 'credit');
   const totalSpend = debits.reduce((s, t) => s + t.amount, 0);
-  const totalIncome = credits.reduce((s, t) => s + t.amount, 0);
+  // Exclude transfers & payments from income — CC bill payments are not income
+  const totalIncome = credits
+    .filter(t => t.category !== 'Transfers & Payments')
+    .reduce((s, t) => s + t.amount, 0);
 
   const chartData = useMemo(() => {
     const cats: Record<string, number> = {};

@@ -10,6 +10,7 @@ const SKIP_LINES = [
   'balance b/f', 'balance c/f', 'balance brought', 'balance carried',
   'previous balance', 'sub total', 'total', 'min. payment', 'minimum payment',
   'new balance', 'credit limit',
+  'payment received', 'payment - thank you', 'autopay', 'auto pay',
 ];
 
 // DD Mon [YY|YYYY] → YYYY-MM-DD, returns null if unrecognised
