@@ -29,7 +29,7 @@ export function usePriceRefresh() {
 
     const metalTickers = holdings
       .filter(h => h.assetClass === 'metal')
-      .map(h => h.metalType === 'gold' ? 'XAU/USD' : 'XAG/USD');
+      .map(h => h.metalType === 'gold' ? 'GC=F' : 'SI=F');
 
     const cryptoIds = holdings
       .filter(h => h.assetClass === 'crypto')
@@ -47,7 +47,7 @@ export function usePriceRefresh() {
         const price = cryptoPrices[holding.ticker];
         if (price != null) updates.push({ id: holding.id, lastPrice: price, lastFetchedAt: now });
       } else if (holding.assetClass === 'metal') {
-        const symbol = holding.metalType === 'gold' ? 'XAU/USD' : 'XAG/USD';
+        const symbol = holding.metalType === 'gold' ? 'GC=F' : 'SI=F';
         const quote = stockQuotes[symbol];
         if (quote) {
           // price is per troy oz; adjust for quantity stored in holding's unit

@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express';
+import YahooFinance from 'yahoo-finance2';
 
 const router = Router();
+const yf = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
 
 router.get('/', async (req: Request, res: Response) => {
   const symbol = req.query.symbol as string;
@@ -9,20 +11,24 @@ router.get('/', async (req: Request, res: Response) => {
     return;
   }
 
-  const apiKey = process.env.TWELVE_DATA_API_KEY;
-  if (!apiKey) {
-    res.status(500).json({ error: 'API key not configured' });
-    return;
-  }
-
-  const url = `https://api.twelvedata.com/quote?symbol=${encodeURIComponent(symbol)}&apikey=${apiKey}`;
-
   try {
-    const response = await fetch(url);
-    const data = await response.json();
-    res.json(data);
-  } catch (err) {
-    res.status(502).json({ error: 'Failed to fetch from Twelve Data' });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const quote = await (yf as any).quote(symbol);
+
+    if (!quote || quote.regularMarketPrice == null) {
+      res.status(404).json({ error: 'Symbol not found' });
+      return;
+    }
+
+    res.json({
+      symbol: quote.symbol,
+      name: quote.longName ?? quote.shortName ?? quote.symbol,
+      price: quote.regularMarketPrice,
+      currency: quote.currency ?? 'USD',
+      marketState: quote.marketState ?? 'CLOSED',
+    });
+  } catch {
+    res.status(404).json({ error: 'Symbol not found' });
   }
 });
 

@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express';
+import YahooFinance from 'yahoo-finance2';
 
 const router = Router();
+const yf = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
 
 router.get('/', async (req: Request, res: Response) => {
   const query = req.query.query as string;
@@ -9,20 +11,27 @@ router.get('/', async (req: Request, res: Response) => {
     return;
   }
 
-  const apiKey = process.env.TWELVE_DATA_API_KEY;
-  if (!apiKey) {
-    res.status(500).json({ error: 'API key not configured' });
-    return;
-  }
-
-  const url = `https://api.twelvedata.com/symbol_search?symbol=${encodeURIComponent(query)}&apikey=${apiKey}`;
-
   try {
-    const response = await fetch(url);
-    const data = await response.json();
-    res.json(data);
-  } catch (err) {
-    res.status(502).json({ error: 'Failed to fetch from Twelve Data' });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = await (yf as any).search(query, { quotesCount: 8, newsCount: 0 });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const quotes: any[] = data?.quotes ?? [];
+
+    const results = quotes
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .filter((q: any) => q.symbol && q.isYahooFinance !== false)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .map((q: any) => ({
+        symbol: q.symbol,
+        name: q.longname ?? q.shortname ?? q.symbol,
+        exchange: q.exchDisp ?? q.exchange ?? '',
+        currency: q.currency ?? 'USD',
+        type: q.typeDisp ?? q.quoteType ?? 'Equity',
+      }));
+
+    res.json({ results });
+  } catch {
+    res.status(502).json({ error: 'Failed to fetch from Yahoo Finance' });
   }
 });
 

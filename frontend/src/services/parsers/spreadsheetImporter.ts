@@ -86,7 +86,7 @@ export function parseSpreadsheet(csvText: string): ImportPreviewEntry[] {
       entries.push({
         kind: 'holding',
         data: {
-          ticker: 'XAU/USD', name: 'Gold', assetClass: 'metal', metalType: 'gold',
+          ticker: 'GC=F', name: 'Gold', assetClass: 'metal', metalType: 'gold',
           quantity: qty, weightUnit: 'troy_oz', currency: 'USD',
           lastPrice: price, lastFetchedAt: new Date().toISOString(), account: null, notes: null,
         },
@@ -97,7 +97,7 @@ export function parseSpreadsheet(csvText: string): ImportPreviewEntry[] {
       entries.push({
         kind: 'holding',
         data: {
-          ticker: 'XAG/USD', name: 'Silver', assetClass: 'metal', metalType: 'silver',
+          ticker: 'SI=F', name: 'Silver', assetClass: 'metal', metalType: 'silver',
           quantity: qty, weightUnit: 'troy_oz', currency: 'USD',
           lastPrice: price, lastFetchedAt: new Date().toISOString(), account: null, notes: null,
         },

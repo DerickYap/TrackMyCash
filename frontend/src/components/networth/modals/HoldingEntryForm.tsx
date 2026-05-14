@@ -66,7 +66,7 @@ export function HoldingEntryForm({ initial, onSave, onCancel }: Props) {
     e.preventDefault();
     const now = new Date().toISOString();
     onSave({
-      ticker: assetClass === 'metal' ? (metalType === 'gold' ? 'XAU/USD' : 'XAG/USD') : ticker.trim(),
+      ticker: assetClass === 'metal' ? (metalType === 'gold' ? 'GC=F' : 'SI=F') : ticker.trim(),
       name: assetClass === 'metal' ? (metalType === 'gold' ? 'Gold' : 'Silver') : fetchedName || ticker,
       assetClass,
       metalType: assetClass === 'metal' ? metalType : null,

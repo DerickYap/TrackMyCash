@@ -22,6 +22,7 @@ cd frontend && npm run dev       # runs on localhost:5173
 - Vite `/api` proxy in dev: frontend calls `/api/quote` → Vite forwards to `localhost:3001/api/quote`
 - 4 separate React context slices (Networth, Expense, Projection, Settings) — prevents cross-module re-renders
 - localStorage keys: `nw_entries`, `nw_transactions`, `nw_settings`, `nw_category_memory`, `nw_projection_scenarios`
+- `packages/ui` design system package (npm workspaces) — Button, Input, Select, Modal, Badge, Card, Label, FormField + design tokens (`@theme` CSS block) + `chartColors.ts`
 
 ### Networth Module ✅
 - `SummaryStrip` — total assets, liabilities, net worth
@@ -34,11 +35,11 @@ cd frontend && npm run dev       # runs on localhost:5173
 - `useFxRate` hook — frankfurter.app, 60-min cache, manual override
 
 **HoldingEntryForm ticker flow:**
-- While typing → calls `searchStocks` (symbol search) only — shows dropdown suggestions
+- While typing → calls `searchStocks` (symbol search) — shows dropdown suggestions
 - On blur (leaving field) → calls `fetchQuote` for price
 - On selecting a suggestion → calls `fetchQuote` for that symbol immediately
 - Crypto: CoinGecko search + price (direct, no proxy needed)
-- Metals: gold `XAU/USD`, silver `XAG/USD` via Twelve Data proxy
+- Metals: gold `GC=F`, silver `SI=F` via yahoo-finance2 (futures, tracks spot price)
 
 ### Expense Module ✅
 Parsers in `frontend/src/services/parsers/`:
@@ -60,41 +61,14 @@ Parsers in `frontend/src/services/parsers/`:
 
 ### Backend Routes
 - `GET /health` — health check
-- `GET /api/quote?symbol=` — proxies Twelve Data `/quote` (encodes symbol for XAU/USD)
-- `GET /api/search?query=` — proxies Twelve Data `/symbol_search`
+- `GET /api/quote?symbol=` — fetches quote via `yahoo-finance2` (`new YahooFinance()`)
+- `GET /api/search?query=` — searches symbols via `yahoo-finance2`
+
+**No API key required.** `yahoo-finance2` handles cookie/crumb auth internally.
 
 ---
 
 ## What's NOT Done Yet
-
-### 🔴 Priority: Switch from Twelve Data to Yahoo Finance
-**Why:** Twelve Data free plan = 8 API credits/minute. Hits the cap easily with multiple holdings + searching.
-
-**Yahoo Finance advantages:** Free, no API key, ~unlimited rate, supports SGX (`.SI` suffix), spot metals (`XAUUSD=X`, `XAGUSD=X`).
-
-**What needs changing:**
-1. `backend/src/routes/quote.ts` — replace Twelve Data URL with Yahoo Finance chart endpoint:
-   ```
-   GET https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1d&range=1d
-   ```
-   Response path: `data.chart.result[0].meta.regularMarketPrice` and `data.chart.result[0].meta.currency`
-
-2. `backend/src/routes/search.ts` — replace with Yahoo Finance quote search:
-   ```
-   GET https://query2.finance.yahoo.com/v1/finance/search?q={query}&quotesCount=8&newsCount=0
-   ```
-   Response path: `data.quotes[]` with fields `symbol`, `longname`/`shortname`, `exchange`, `currency`, `typeDisp`
-
-3. `frontend/src/services/api/twelveData.ts` — update `fetchQuote` to parse Yahoo response format
-
-4. `frontend/src/services/parsers/spreadsheetImporter.ts` — gold ticker `XAU/USD` → `XAUUSD=X`, silver `XAG/USD` → `XAGUSD=X`
-
-5. `backend/.env` — remove `TWELVE_DATA_API_KEY` (no longer needed)
-
-6. `backend/src/routes/quote.ts` — no API key needed, but add `User-Agent` header to Yahoo requests to avoid 429s:
-   ```
-   'User-Agent': 'Mozilla/5.0'
-   ```
 
 ### 🟡 Goal Projector Module (Phase 6 from plan)
 Not started. All types are defined in `frontend/src/types/projection.ts`.
@@ -111,11 +85,21 @@ Files to create:
 
 Default return rates are in `frontend/src/constants/defaultReturnRates.ts`. The projection tab is already wired in `App.tsx` but renders a placeholder.
 
-### 🟡 Distribution / Packaging
-User asked how to distribute the app for others to run locally. Three options were presented but never decided:
-1. **Single Node.js bundle** — Express serves built React files, distribute as zip
-2. **Docker Compose** — one command `docker compose up`
-3. **Electron desktop app** — double-click `.app`/`.exe`
+### 🟡 Desktop Launcher
+Goal: double-click to open the app without VSCode or a terminal.
+Decided approach: **Express serves the built React files** (single process, single port).
+- Express on port 3001 serves both `/api/*` and `frontend/dist` static files
+- Frontend `fetch('/api/...')` calls work same-origin — no proxy needed in production
+- Wrap in a macOS `.command` file: builds frontend, starts Express, opens `localhost:3001` in browser
+- Vite dev server still works unchanged for development
+
+### 🟡 Design System Migration (packages/ui)
+The `packages/ui` package is set up with components and tokens but the existing app components haven't been migrated yet to use them. Migration order when ready:
+1. `components/networth/modals/` — highest duplication density
+2. `components/expense/`
+3. `components/layout/`
+4. `components/projection/`
+5. Chart color sweep — replace local `COLORS` arrays with `chartColorArray` from `@trackmycash/ui/tokens/chartColors`
 
 ---
 
@@ -123,38 +107,46 @@ User asked how to distribute the app for others to run locally. Three options we
 
 ```
 track-my-cash/
+├── package.json                          ← npm workspaces root (packages/*, frontend, backend)
+├── packages/ui/                          ← design system package (@trackmycash/ui)
+│   └── src/
+│       ├── tokens/tokens.css             ← Tailwind v4 @theme design tokens
+│       ├── tokens/chartColors.ts         ← single source for Recharts color constants
+│       └── components/                   ← Button, Input, Select, Modal, Badge, Card, Label, FormField
 ├── backend/
-│   ├── .env                          ← TWELVE_DATA_API_KEY (to be replaced)
-│   ├── src/
-│   │   ├── index.ts                  ← Express app, port 3001
-│   │   ├── routes/quote.ts           ← /api/quote proxy
-│   │   ├── routes/search.ts          ← /api/search proxy
-│   │   └── middleware/rateLimiter.ts ← 60 req/min (raised from 10)
+│   ├── .env                              ← ALLOWED_ORIGIN, PORT (no API key needed)
+│   └── src/
+│       ├── index.ts                      ← Express app, port 3001
+│       ├── routes/quote.ts               ← /api/quote via yahoo-finance2
+│       ├── routes/search.ts              ← /api/search via yahoo-finance2
+│       └── middleware/rateLimiter.ts     ← 60 req/min
 └── frontend/
-    ├── src/
-    │   ├── types/networth.ts         ← ManualEntry, HoldingEntry, EntryUnion
-    │   ├── types/settings.ts         ← AppSettings, DEFAULT_SETTINGS, fxRate=0.74
-    │   ├── store/AppContext.tsx       ← 4 context slices, localStorage init
-    │   ├── hooks/usePriceRefresh.ts  ← staggered 800ms between requests
-    │   ├── services/api/twelveData.ts ← fetchQuote, fetchQuotes, searchStocks
-    │   ├── services/api/coinGecko.ts  ← fetchCryptoPrices, searchCoinGecko
-    │   ├── services/api/frankfurter.ts ← FX rate fetch
-    │   ├── services/parsers/
-    │   │   ├── uobParser.ts          ← routes PDF→uobCreditPdfParser, XLS, CSV
-    │   │   └── uobCreditPdfParser.ts ← pdfjs-dist, credit card PDF format
-    │   └── components/
-    │       ├── layout/TopBar.tsx
-    │       ├── layout/SettingsPanel.tsx
-    │       ├── layout/SpreadsheetImportModal.tsx
-    │       ├── networth/NetworthTab.tsx
-    │       ├── networth/AllocationChart.tsx
-    │       └── networth/modals/HoldingEntryForm.tsx
+    └── src/
+        ├── types/networth.ts             ← ManualEntry, HoldingEntry, EntryUnion
+        ├── types/settings.ts             ← AppSettings, DEFAULT_SETTINGS, fxRate=0.74
+        ├── store/AppContext.tsx           ← 4 context slices, localStorage init
+        ├── hooks/usePriceRefresh.ts      ← staggered 800ms between requests
+        ├── services/api/twelveData.ts    ← fetchQuote, fetchQuotes, searchStocks (parses yahoo-finance2 response)
+        ├── services/api/coinGecko.ts     ← fetchCryptoPrices, searchCoinGecko
+        ├── services/api/frankfurter.ts   ← FX rate fetch
+        ├── services/parsers/
+        │   ├── uobParser.ts              ← routes PDF→uobCreditPdfParser, XLS, CSV
+        │   └── uobCreditPdfParser.ts     ← pdfjs-dist, credit card PDF format
+        └── components/
+            ├── layout/TopBar.tsx
+            ├── layout/SettingsPanel.tsx
+            ├── layout/SpreadsheetImportModal.tsx
+            ├── networth/NetworthTab.tsx
+            ├── networth/AllocationChart.tsx
+            └── networth/modals/HoldingEntryForm.tsx
 ```
 
 ## Known Gotchas
 - **Tailwind v4** uses `@import "tailwindcss"` in CSS and `@tailwindcss/vite` plugin — NOT `@tailwind base/components/utilities` or PostCSS config
 - **UOB credit card PDF** columns: Post Date | Trans Date | Description | Amount (CR suffix = credit). Year extracted from "Statement Date DD MMM YYYY" on page 1
 - **CPF double-counting**: UI shows warning "Exclude CPFIS amount" on CPF OA field
-- **Metal values**: stored as original weight + unit; converted to troy oz at display time via `toTroyOz()` in `metalConversion.ts`
-- **XAU/USD slash** must be `encodeURIComponent`-encoded in proxy URL (→ `XAU%2FUSD`) — Yahoo Finance uses `XAUUSD=X` which has no encoding issue
+- **Metal values**: stored as original weight + unit; converted to troy oz at display time via `toTroyOz()` in `metalConversion.ts`. Price source is `GC=F` (gold) and `SI=F` (silver) futures — tracks spot closely
+- **Metal tickers in localStorage**: existing entries saved before this session may have `ticker: 'XAU/USD'` or `'XAG/USD'`. Price refresh still works because `usePriceRefresh` derives the Yahoo ticker from `metalType`, not the stored ticker value
+- **yahoo-finance2 v3 API**: must use `new YahooFinance()` — the old singleton default export no longer works (throws "Call new YahooFinance() first")
+- **`services/api/twelveData.ts`**: filename is a misnomer — it now parses yahoo-finance2 responses. Rename to `yahooFinance.ts` when convenient (2 import sites: `HoldingEntryForm.tsx`, `usePriceRefresh.ts`)
 - **Projection tab**: wired in App.tsx, currently renders a placeholder `<div>`

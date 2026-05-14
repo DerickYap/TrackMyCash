@@ -1,0 +1,30 @@
+@theme {
+  /* Primary (blue-600 / blue-700) */
+  --color-primary: oklch(47.3% 0.226 264.4);
+  --color-primary-hover: oklch(41.4% 0.211 264.4);
+  --color-primary-subtle: oklch(97.1% 0.014 254.6);
+  --color-primary-fg: oklch(100% 0 0);
+
+  /* Semantic */
+  --color-success: oklch(52.7% 0.154 150);
+  --color-success-hover: oklch(46.5% 0.138 150);
+  --color-danger: oklch(57.7% 0.245 27.3);
+  --color-danger-hover: oklch(50.6% 0.218 27.3);
+  --color-danger-subtle: oklch(97.1% 0.013 17.4);
+  --color-warning: oklch(69.8% 0.16 73.7);
+  --color-warning-fg: oklch(39.4% 0.096 73.7);
+  --color-warning-subtle: oklch(95.6% 0.038 75.2);
+
+  /* Surfaces */
+  --color-surface: oklch(100% 0 0);
+  --color-surface-subtle: oklch(98.1% 0.003 247.9);
+
+  /* Borders */
+  --color-border: oklch(92.8% 0.006 247.9);
+  --color-border-input: oklch(87.2% 0.01 258.3);
+
+  /* Text */
+  --color-text-base: oklch(13% 0.028 264.4);
+  --color-text-secondary: oklch(44.6% 0.03 256.7);
+  --color-text-muted: oklch(62% 0.019 258.3);
+}

@@ -11,13 +11,13 @@ export async function fetchQuote(symbol: string): Promise<QuoteResult | null> {
     const res = await fetch(`/api/quote?symbol=${encodeURIComponent(symbol)}`);
     if (!res.ok) return null;
     const data = await res.json();
-    if (data.status === 'error' || !data.close) return null;
+    if (data.error || data.price == null) return null;
     return {
       symbol: data.symbol,
       name: data.name,
-      price: parseFloat(data.close),
+      price: data.price,
       currency: data.currency,
-      isMarketOpen: data.is_market_open === true,
+      isMarketOpen: data.marketState === 'REGULAR',
     };
   } catch {
     return null;
@@ -46,13 +46,13 @@ export async function searchStocks(query: string): Promise<StockSuggestion[]> {
     const res = await fetch(`/api/search?query=${encodeURIComponent(query)}`);
     if (!res.ok) return [];
     const data = await res.json();
-    if (!Array.isArray(data.data)) return [];
-    return data.data.slice(0, 8).map((item: Record<string, string>) => ({
+    if (!Array.isArray(data.results)) return [];
+    return data.results.slice(0, 8).map((item: Record<string, string>) => ({
       symbol: item.symbol,
-      name: item.instrument_name,
+      name: item.name,
       exchange: item.exchange,
       currency: item.currency,
-      type: item.instrument_type,
+      type: item.type,
     }));
   } catch {
     return [];
