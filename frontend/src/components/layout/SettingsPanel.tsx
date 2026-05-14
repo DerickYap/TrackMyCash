@@ -72,7 +72,7 @@ export function SettingsPanel({ onClose }: Props) {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = ev => {
+    reader.onload = async ev => {
       try {
         const data = JSON.parse(ev.target?.result as string);
         if (data.nw_entries) localStorage.setItem('nw_entries', JSON.stringify(data.nw_entries));
@@ -81,7 +81,7 @@ export function SettingsPanel({ onClose }: Props) {
         if (data.nw_settings) localStorage.setItem('nw_settings', JSON.stringify(data.nw_settings));
         if (data.nw_projection_scenarios) localStorage.setItem('nw_projection_scenarios', JSON.stringify(data.nw_projection_scenarios));
         if (user) {
-          upsertUserData(user.id, {
+          await upsertUserData(user.id, {
             entries: data.nw_entries ?? [],
             transactions: data.nw_transactions ?? [],
             settings: data.nw_settings ?? DEFAULT_SETTINGS,

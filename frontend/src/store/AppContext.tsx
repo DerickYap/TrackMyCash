@@ -164,7 +164,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Persist to localStorage + debounced cloud sync
   useEffect(() => {
     localStorage.setItem(KEYS.entries, JSON.stringify(networthState.entries));
-    debouncedSync('entries', { entries: networthState.entries }, 5000);
+    debouncedSync('entries', { entries: networthState.entries }, 1000);
   }, [networthState.entries]);
 
   useEffect(() => {
