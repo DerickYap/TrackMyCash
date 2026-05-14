@@ -5,41 +5,34 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PORT=3001
 URL="http://localhost:$PORT"
 
-# Binaries (called directly to avoid npm EPERM issues on macOS)
-TSC="$REPO/node_modules/.bin/tsc"
+# Binaries — called directly to avoid npm EPERM issues on macOS
 VITE="$REPO/frontend/node_modules/.bin/vite"
+TS_NODE="$REPO/backend/node_modules/.bin/ts-node"
 
 # Kill any existing instance on this port
 lsof -ti:$PORT | xargs kill -9 2>/dev/null || true
 sleep 0.5
 
-# Build frontend if dist is missing (first run, or after deleting dist to force rebuild)
+# Build frontend if dist is missing (first run, or after deleting dist to force a rebuild)
 if [ ! -f "$REPO/frontend/dist/index.html" ]; then
   echo "Building frontend..."
   cd "$REPO/frontend" && "$VITE" build
   if [ ! -f "$REPO/frontend/dist/index.html" ]; then
-    echo "ERROR: Frontend build failed. Open Terminal in the project folder and run:"
-    echo "  npm run build --workspace=frontend"
+    echo ""
+    echo "ERROR: Frontend build failed."
+    echo "Open a terminal in the project folder and run: npm run build --workspace=frontend"
     read -rp "Press Enter to exit..." && exit 1
   fi
 fi
 
-# Compile backend TypeScript
-echo "Compiling backend..."
-"$TSC" -p "$REPO/backend/tsconfig.json"
-if [ ! -f "$REPO/backend/dist/index.js" ]; then
-  echo "ERROR: Backend compile failed."
-  read -rp "Press Enter to exit..." && exit 1
-fi
-
-# Start the server
+# Start the backend via ts-node (compiles in memory — no dist/ file needed)
 echo "Starting Track My Cash..."
 cd "$REPO"
-NODE_ENV=production node "$REPO/backend/dist/index.js" &
+NODE_ENV=production "$TS_NODE" "$REPO/backend/src/index.ts" &
 SERVER_PID=$!
 
-# Wait until the server is ready
-for i in $(seq 1 20); do
+# Wait until the server is ready (up to 15 seconds)
+for i in $(seq 1 30); do
   curl -s "$URL/health" > /dev/null 2>&1 && break
   sleep 0.5
 done
