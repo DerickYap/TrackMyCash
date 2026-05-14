@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { useSettings, useNetworth, useExpense, useProjection } from '../../store/AppContext';
 import { SpreadsheetImportModal } from './SpreadsheetImportModal';
+import { useAuth } from '../../store/AuthContext';
+import { upsertUserData } from '../../services/cloudStorage';
+import { DEFAULT_SETTINGS } from '../../store/settingsReducer';
 
 const STORAGE_KEYS = ['nw_entries', 'nw_transactions', 'nw_settings', 'nw_category_memory', 'nw_projection_scenarios'];
 
@@ -21,6 +24,7 @@ export function SettingsPanel({ onClose }: Props) {
   const { state: networthState } = useNetworth();
   const { state: expenseState } = useExpense();
   const { state: projState } = useProjection();
+  const { user } = useAuth();
 
   const [proxyUrl, setProxyUrl] = useState(settings.proxyBaseUrl);
   const [fxInput, setFxInput] = useState(String(settings.fxRate));
@@ -76,6 +80,15 @@ export function SettingsPanel({ onClose }: Props) {
         if (data.nw_category_memory) localStorage.setItem('nw_category_memory', JSON.stringify(data.nw_category_memory));
         if (data.nw_settings) localStorage.setItem('nw_settings', JSON.stringify(data.nw_settings));
         if (data.nw_projection_scenarios) localStorage.setItem('nw_projection_scenarios', JSON.stringify(data.nw_projection_scenarios));
+        if (user) {
+          upsertUserData(user.id, {
+            entries: data.nw_entries ?? [],
+            transactions: data.nw_transactions ?? [],
+            settings: data.nw_settings ?? DEFAULT_SETTINGS,
+            category_memory: data.nw_category_memory ?? {},
+            scenarios: data.nw_projection_scenarios ?? [],
+          });
+        }
         window.location.reload();
       } catch {
         alert('Failed to import: invalid JSON file.');
@@ -86,6 +99,12 @@ export function SettingsPanel({ onClose }: Props) {
 
   function clearAll() {
     for (const key of STORAGE_KEYS) localStorage.removeItem(key);
+    if (user) {
+      upsertUserData(user.id, {
+        entries: [], transactions: [], settings: DEFAULT_SETTINGS,
+        category_memory: {}, categories: [], scenarios: [],
+      });
+    }
     window.location.reload();
   }
 

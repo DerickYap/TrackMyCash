@@ -1,4 +1,5 @@
 import { useSettings } from '../../store/AppContext';
+import { useAuth } from '../../store/AuthContext';
 
 interface Props {
   onSettingsOpen: () => void;
@@ -9,6 +10,7 @@ interface Props {
 
 export function TopBar({ onSettingsOpen, onRefresh, isRefreshing, cooldownActive }: Props) {
   const { state, dispatch } = useSettings();
+  const { user, signOut } = useAuth();
 
   return (
     <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-gray-200">
@@ -60,6 +62,26 @@ export function TopBar({ onSettingsOpen, onRefresh, isRefreshing, cooldownActive
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
         </button>
+
+        {/* User avatar + sign out */}
+        {user && (
+          <div className="flex items-center gap-2 pl-1 border-l border-gray-200">
+            {user.user_metadata?.avatar_url && (
+              <img
+                src={user.user_metadata.avatar_url}
+                className="w-7 h-7 rounded-full"
+                alt=""
+                referrerPolicy="no-referrer"
+              />
+            )}
+            <button
+              onClick={signOut}
+              className="text-xs text-gray-500 hover:text-gray-700 transition-colors"
+            >
+              Sign out
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

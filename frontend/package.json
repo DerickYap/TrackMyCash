@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.49.0",
     "@trackmycash/ui": "*",
     "papaparse": "^5.5.3",
     "pdfjs-dist": "^5.7.284",
