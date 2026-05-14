@@ -31,8 +31,8 @@ export const CATEGORY_KEYWORDS: Record<string, string[]> = {
     'icloud', 'youtube', 'disney', 'amazon prime',
   ],
   'Transfers & Payments': [
-    'paynow', 'fast', 'giro', 'paylah', 'transfer', 'payment', 'bill payment',
-    'atm withdrawal', 'cash withdrawal',
+    'paynow', 'fast', 'giro', 'paylah', 'transfer', 'payment', 'paymt',
+    'bill payment', 'atm withdrawal', 'cash withdrawal',
   ],
   'Income': [
     'salary', 'payroll', 'interest', 'dividend', 'bonus', 'credit interest',
