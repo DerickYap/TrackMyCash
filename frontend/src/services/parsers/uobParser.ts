@@ -86,8 +86,9 @@ export async function parseUOB(
   if (name.endsWith('.pdf')) {
     const firstPage = await extractFirstPageText(file);
     const lower = firstPage.toLowerCase();
-    // Bank account statements have Withdrawals/Deposits columns; CC statements do not
-    if (lower.includes('withdrawals') || lower.includes('balance b/f')) {
+    // UOB bank account page 1 says "Statement of Account";
+    // credit card PDFs say "Credit Card" or similar — never "Statement of Account"
+    if (lower.includes('statement of account') || lower.includes('withdrawals') || lower.includes('balance b/f')) {
       return parseUOBBankPdf(file);
     }
     return parseUOBCreditPdf(file);
