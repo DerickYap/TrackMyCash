@@ -9,7 +9,7 @@ Personal finance tracker for net worth, expenses, and projections. Runs entirely
 ## Features
 
 - **Net Worth** — track bank accounts, CPF, stocks, ETFs, mutual funds, crypto, and precious metals with live prices
-- **Expenses** — upload bank statements (DBS, UOB, Chase, Amex, BofA) for automatic parsing and categorisation
+- **Expenses** — upload bank statements for automatic parsing and categorisation
 - **Projections** — *(coming soon)*
 - Live FX rates (SGD ↔ USD), SGX stock support (`.SI` suffix), CoinGecko crypto prices
 - No API keys required

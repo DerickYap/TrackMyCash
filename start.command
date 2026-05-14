@@ -9,6 +9,11 @@ URL="http://localhost:$PORT"
 VITE="$REPO/frontend/node_modules/.bin/vite"
 TS_NODE="$REPO/backend/node_modules/.bin/ts-node"
 
+# Strip macOS quarantine flags that npm sets on downloaded packages.
+# Finder-launched Terminal enforces stricter Gatekeeper rules, which blocks
+# Node.js from reading quarantined node_modules files with EPERM.
+xattr -rd com.apple.quarantine "$REPO" 2>/dev/null || true
+
 # Kill any existing instance on this port
 lsof -ti:$PORT | xargs kill -9 2>/dev/null || true
 sleep 0.5

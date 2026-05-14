@@ -1,10 +1,5 @@
-import * as pdfjsLib from 'pdfjs-dist';
+import { extractLines } from './pdfUtils';
 import { RawTransaction } from '../../types/expense';
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url,
-).href;
 
 const MONTH_MAP: Record<string, string> = {
   JAN: '01', FEB: '02', MAR: '03', APR: '04', MAY: '05', JUN: '06',
@@ -23,55 +18,6 @@ const SKIP_PREFIXES = [
   'previous balance', 'sub total', 'total balance', 'ref no',
   'end of transaction', 'statement date', 'page ',
 ];
-
-interface TextItem {
-  x: number;
-  y: number;
-  text: string;
-}
-
-async function extractLines(file: File): Promise<string[]> {
-  const buffer = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
-
-  const allLines: string[] = [];
-
-  for (let p = 1; p <= pdf.numPages; p++) {
-    const page = await pdf.getPage(p);
-    const viewport = page.getViewport({ scale: 1 });
-    const content = await page.getTextContent();
-
-    const items: TextItem[] = [];
-    for (const raw of content.items) {
-      if (!('str' in raw) || !raw.str.trim()) continue;
-      const [, , , , x, y] = raw.transform as number[];
-      items.push({ x, y: viewport.height - y, text: raw.str.trim() });
-    }
-
-    // Group into visual rows by y proximity
-    items.sort((a, b) => a.y - b.y || a.x - b.x);
-    let rowY = -1;
-    let row: TextItem[] = [];
-
-    const flushRow = () => {
-      if (row.length === 0) return;
-      const sorted = row.sort((a, b) => a.x - b.x);
-      allLines.push(sorted.map(i => i.text).join(' '));
-      row = [];
-    };
-
-    for (const item of items) {
-      if (rowY < 0 || Math.abs(item.y - rowY) > 3) {
-        flushRow();
-        rowY = item.y;
-      }
-      row.push(item);
-    }
-    flushRow();
-  }
-
-  return allLines;
-}
 
 function inferYear(lines: string[]): number {
   // Look for "Statement Date DD MMM YYYY"

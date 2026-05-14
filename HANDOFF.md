@@ -1,7 +1,7 @@
 # Track My Cash — Handoff Document
 
 ## Project Overview
-Personal finance web app. React + Vite + TypeScript + Tailwind v4 frontend. Node.js + Express backend proxy. All data in localStorage (no database, no login). Two currencies: SGD and USD with live FX conversion.
+Personal finance web app. React + Vite + TypeScript + Tailwind v4 frontend. Node.js + Express backend proxy. Data stored in Supabase PostgreSQL per user, with localStorage as a same-device cache. Google OAuth login via Supabase Auth. Two currencies: SGD and USD with live FX conversion.
 
 **Dev commands:**
 ```bash
@@ -12,17 +12,54 @@ cd backend && npm run dev        # runs on localhost:3001
 cd frontend && npm run dev       # runs on localhost:5173
 ```
 
+**Required env file:** `frontend/.env.local` (see `frontend/.env.local.example`)
+```
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key-here
+```
+
 ---
 
 ## What's Been Built
 
 ### Infrastructure
 - Vite + React + TypeScript + Tailwind v4 (`@tailwindcss/vite` plugin — NOT the old PostCSS setup)
-- Express backend proxy on port 3001 (CORS restricted to localhost:5173)
+- Express backend proxy on port 3001 (CORS restricted to localhost:5173 in dev; serves frontend/dist in production)
 - Vite `/api` proxy in dev: frontend calls `/api/quote` → Vite forwards to `localhost:3001/api/quote`
-- 4 separate React context slices (Networth, Expense, Projection, Settings) — prevents cross-module re-renders
+- 4 separate React context slices (Networth, Expense, Projection, Settings) + SyncContext — prevents cross-module re-renders
 - localStorage keys: `nw_entries`, `nw_transactions`, `nw_settings`, `nw_category_memory`, `nw_projection_scenarios`
 - `packages/ui` design system package (npm workspaces) — Button, Input, Select, Modal, Badge, Card, Label, FormField + design tokens (`@theme` CSS block) + `chartColors.ts`
+
+### Authentication & Cloud Storage ✅
+- **Google OAuth** via Supabase Auth (PKCE flow) — `frontend/src/store/AuthContext.tsx`
+- **Supabase PostgreSQL** — single `user_data` table, one row per user, JSONB columns per data type
+- **Row Level Security** — users can only read/write their own row (`auth.uid() = user_id`)
+- **Sync strategy**: localStorage initialises reducers instantly on load (same-device cache), then Supabase data loads and overwrites via `LOAD` dispatch
+- **Write-through**: debounced upsert to Supabase on every state change (1s for entries, 500ms for others)
+- **Migration banner**: shown on first login if localStorage has existing data — offers to import or discard
+- **Sign-out**: clears localStorage + resets all reducers, returns to login page
+
+**Supabase table schema:**
+```sql
+CREATE TABLE user_data (
+  user_id         UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  entries         JSONB DEFAULT '[]',       -- EntryUnion[]
+  transactions    JSONB DEFAULT '[]',       -- Transaction[]
+  settings        JSONB,                    -- AppSettings
+  category_memory JSONB DEFAULT '{}',       -- Record<string,string>
+  categories      JSONB DEFAULT '[]',       -- string[] (user-defined, reserved for future use)
+  scenarios       JSONB DEFAULT '[]',       -- Scenario[]
+  updated_at      TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+**Key auth/sync files:**
+- `frontend/src/lib/supabase.ts` — Supabase client singleton
+- `frontend/src/store/AuthContext.tsx` — `AuthProvider`, `useAuth()` — Google sign-in/out, session state
+- `frontend/src/services/cloudStorage.ts` — `fetchUserData`, `upsertUserData`
+- `frontend/src/components/auth/LoginPage.tsx` — Google sign-in page
+- `frontend/src/components/auth/MigrationBanner.tsx` — first-login local data migration prompt
+- `frontend/src/store/AppContext.tsx` — SyncContext, cloud load on login, debounced write-through
 
 ### Networth Module ✅
 - `SummaryStrip` — total assets, liabilities, net worth
@@ -43,20 +80,23 @@ cd frontend && npm run dev       # runs on localhost:5173
 
 ### Expense Module ✅
 Parsers in `frontend/src/services/parsers/`:
-| Bank | File | Format |
-|------|------|--------|
-| DBS | `dbsParser.ts` | CSV |
-| UOB | `uobParser.ts` + `uobCreditPdfParser.ts` | PDF (credit card), XLS, or CSV |
-| Chase | `chaseParser.ts` | CSV |
-| Amex | `amexParser.ts` | CSV (SGD or USD selectable) |
-| BofA | `bofaParser.ts` | CSV or XLS |
+| Bank | CSV/XLS file | PDF file |
+|------|-------------|----------|
+| DBS | `dbsParser.ts` | `dbsPdfParser.ts` — auto-detects CC vs bank account; column x-coords distinguish withdrawal/deposit |
+| UOB | `uobParser.ts` (XLS + CSV) | `uobCreditPdfParser.ts` — credit card PDF only |
+| Chase | `chaseParser.ts` | `chasePdfParser.ts` |
+| Amex | `amexParser.ts` (SGD or USD selectable) | `amexPdfParser.ts` — handles SGD `DD Mon` and USD `MM/DD/YY` formats |
+| BofA | `bofaParser.ts` | `bofaPdfParser.ts` — auto-detects CC vs bank account |
 
+- `pdfUtils.ts` — shared pdfjs-dist text extraction used by all PDF parsers (`extractRows`, `extractLines`, `extractFirstPageText`)
+- `detectBank.ts` — auto-detects bank from file content: PDFs scan first-page text for bank name; CSVs fingerprint header row; XLS converted to CSV first
+- All PDF parsers handle **two-month billing cycles** (e.g. Dec 8 → Jan 7): extracts statement closing month + year, assigns each transaction to the correct year using the same `assignYear` logic as UOB
 - `normaliser.ts` — bank-agnostic: assigns UUID, normalises dates, deduplicates, auto-categorises
-- `UploadArea` → `ReviewScreen` → confirm → dispatch
+- `UploadArea` — file picker → auto-detect → show detected bank (overridable) → Import
 - `MonthlyView` + `ExpenseChart` (Recharts donut) + `TransactionList`
 
 ### Settings & Import ✅
-- `SettingsPanel` — proxy URL, FX override, JSON export/import, clear data (double-confirm)
+- `SettingsPanel` — proxy URL, FX override, JSON export/import (awaits Supabase write before reload), clear data (double-confirm, also clears Supabase)
 - `SpreadsheetImportModal` — imports from the user's specific Google Sheets CSV column layout (col 2-3: summary, col 5-7: individual assets, col 9-11: Robinhood, col 14-16: 401k, col 19-21: IBKR)
 
 ### Backend Routes
@@ -66,16 +106,21 @@ Parsers in `frontend/src/services/parsers/`:
 
 **No API key required.** `yahoo-finance2` handles cookie/crumb auth internally.
 
+### macOS Desktop Launcher ✅
+- `start.command` — double-click from Finder to start the app
+- Uses `ts-node` to compile backend in memory (avoids macOS EPERM on compiled dist files)
+- Builds frontend if `dist/` is missing, then serves via Express on port 3001
+- **Known issue**: macOS restricts Node.js file access for apps launched from `~/Documents`. Move the project to `~/Projects/` or similar, or grant Terminal Full Disk Access in System Settings → Privacy & Security.
+
 ---
 
 ## What's NOT Done Yet
 
-### 🟡 Goal Projector Module (Phase 6 from plan)
+### 🟡 Goal Projector Module
 Not started. All types are defined in `frontend/src/types/projection.ts`.
 
 Files to create:
-- `frontend/src/store/projectionReducer.ts`
-- `frontend/src/hooks/useProjection.ts` — forward: `nw += nw * blendedMonthlyRate + surplus` until target or 540 months; backward: solve for required surplus given fixed target date; blended rate = `Σ(allocationWeight_i × annualReturn_i) / 12`
+- `frontend/src/hooks/useProjection.ts` — forward: `nw += nw * blendedMonthlyRate + surplus` until target or 540 months; backward: solve for required surplus given fixed target date
 - `frontend/src/components/projection/ProjectionTab.tsx`
 - `frontend/src/components/projection/InputPanel.tsx`
 - `frontend/src/components/projection/ReturnAssumptionsPanel.tsx`
@@ -85,13 +130,11 @@ Files to create:
 
 Default return rates are in `frontend/src/constants/defaultReturnRates.ts`. The projection tab is already wired in `App.tsx` but renders a placeholder.
 
-### 🟡 Desktop Launcher
-Goal: double-click to open the app without VSCode or a terminal.
-Decided approach: **Express serves the built React files** (single process, single port).
-- Express on port 3001 serves both `/api/*` and `frontend/dist` static files
-- Frontend `fetch('/api/...')` calls work same-origin — no proxy needed in production
-- Wrap in a macOS `.command` file: builds frontend, starts Express, opens `localhost:3001` in browser
-- Vite dev server still works unchanged for development
+### 🟡 User-Defined Expense Categories
+The `categories` column exists in the `user_data` Supabase table (JSONB `string[]`) but the UI to create/rename/delete categories hasn't been built yet. Currently, categories are auto-assigned by the normaliser and edited per-transaction. The `category_memory` column remembers past assignments for auto-categorisation.
+
+### ✅ Bank Statement Auto-Detection (done)
+`detectBank.ts` fingerprints the file on upload — no manual bank selection needed. PDFs scan first-page text; CSVs check the header row. The detected bank shows in a dropdown the user can override if detection fails.
 
 ### 🟡 Design System Migration (packages/ui)
 The `packages/ui` package is set up with components and tokens but the existing app components haven't been migrated yet to use them. Migration order when ready:
@@ -108,6 +151,7 @@ The `packages/ui` package is set up with components and tokens but the existing 
 ```
 track-my-cash/
 ├── package.json                          ← npm workspaces root (packages/*, frontend, backend)
+├── start.command                         ← macOS double-click launcher
 ├── packages/ui/                          ← design system package (@trackmycash/ui)
 │   └── src/
 │       ├── tokens/tokens.css             ← Tailwind v4 @theme design tokens
@@ -121,25 +165,40 @@ track-my-cash/
 │       ├── routes/search.ts              ← /api/search via yahoo-finance2
 │       └── middleware/rateLimiter.ts     ← 60 req/min
 └── frontend/
+    ├── .env.local                        ← Supabase URL + anon key (not committed)
+    ├── .env.local.example                ← template for above
     └── src/
+        ├── lib/supabase.ts               ← Supabase client singleton
         ├── types/networth.ts             ← ManualEntry, HoldingEntry, EntryUnion
         ├── types/settings.ts             ← AppSettings, DEFAULT_SETTINGS, fxRate=0.74
-        ├── store/AppContext.tsx           ← 4 context slices, localStorage init
+        ├── store/AuthContext.tsx          ← Google OAuth auth state (AuthProvider, useAuth)
+        ├── store/AppContext.tsx           ← 4 context slices + SyncContext, cloud sync
         ├── hooks/usePriceRefresh.ts      ← staggered 800ms between requests
-        ├── services/api/twelveData.ts    ← fetchQuote, fetchQuotes, searchStocks (parses yahoo-finance2 response)
+        ├── services/cloudStorage.ts      ← fetchUserData, upsertUserData
+        ├── services/api/twelveData.ts    ← fetchQuote, searchStocks (yahoo-finance2 responses)
         ├── services/api/coinGecko.ts     ← fetchCryptoPrices, searchCoinGecko
         ├── services/api/frankfurter.ts   ← FX rate fetch
         ├── services/parsers/
+        │   ├── pdfUtils.ts               ← shared pdfjs-dist extraction (extractRows, extractLines, extractFirstPageText)
+        │   ├── detectBank.ts             ← auto-detects bank from PDF text / CSV headers
         │   ├── uobParser.ts              ← routes PDF→uobCreditPdfParser, XLS, CSV
-        │   └── uobCreditPdfParser.ts     ← pdfjs-dist, credit card PDF format
+        │   ├── uobCreditPdfParser.ts     ← UOB CC PDF (uses pdfUtils)
+        │   ├── chasePdfParser.ts         ← Chase CC PDF
+        │   ├── dbsPdfParser.ts           ← DBS CC + bank account PDF
+        │   ├── amexPdfParser.ts          ← Amex CC PDF (SGD + USD)
+        │   └── bofaPdfParser.ts          ← BofA CC + bank account PDF
         └── components/
-            ├── layout/TopBar.tsx
+            ├── auth/LoginPage.tsx        ← Google sign-in page
+            ├── auth/MigrationBanner.tsx  ← first-login local data import prompt
+            ├── layout/TopBar.tsx         ← user avatar + sign-out button
             ├── layout/SettingsPanel.tsx
             ├── layout/SpreadsheetImportModal.tsx
             ├── networth/NetworthTab.tsx
             ├── networth/AllocationChart.tsx
             └── networth/modals/HoldingEntryForm.tsx
 ```
+
+---
 
 ## Known Gotchas
 - **Tailwind v4** uses `@import "tailwindcss"` in CSS and `@tailwindcss/vite` plugin — NOT `@tailwind base/components/utilities` or PostCSS config
@@ -150,3 +209,9 @@ track-my-cash/
 - **yahoo-finance2 v3 API**: must use `new YahooFinance()` — the old singleton default export no longer works (throws "Call new YahooFinance() first")
 - **`services/api/twelveData.ts`**: filename is a misnomer — it now parses yahoo-finance2 responses. Rename to `yahooFinance.ts` when convenient (2 import sites: `HoldingEntryForm.tsx`, `usePriceRefresh.ts`)
 - **Projection tab**: wired in App.tsx, currently renders a placeholder `<div>`
+- **Frankfurter CORS on localhost**: `api.frankfurter.app` blocks direct browser requests from localhost in some configurations. FX rate fetch may silently fail in dev; falls back to stored rate. Works fine in production.
+- **npm workspaces + Vite hoisting**: React gets hoisted to root `node_modules` by npm. `vite.config.ts` has explicit `resolve.alias` entries pointing to `../node_modules/react` to fix Vite's Rolldown optimizer. If you add new packages and see "cannot find react", run `npm install` from the repo root.
+- **Supabase RLS**: if data isn't saving, check Authentication → Policies in the Supabase dashboard. The `user_data_self` policy must exist on the `user_data` table.
+- **Import JSON race condition (fixed)**: `SettingsPanel` now `await`s the Supabase upsert before calling `window.location.reload()` — previously the reload happened before the write completed.
+- **PDF year detection**: parsers only extract years from date-like contexts (month name + year, or `MM/DD/YYYY`). Raw numbers like zip codes (`75267-2050`) or account numbers won't be misread as years.
+- **Two-month billing cycles**: all PDF parsers extract the statement closing month alongside the year. Each transaction is assigned to the correct year via `assignYear(txMonth, endYear, endMonth)` — same logic UOB has always used.
