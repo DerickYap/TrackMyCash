@@ -30,13 +30,13 @@ export const CATEGORY_KEYWORDS: Record<string, string[]> = {
     'netflix', 'spotify', 'apple', 'google', 'chatgpt', 'adobe', 'microsoft',
     'icloud', 'youtube', 'disney', 'amazon prime',
   ],
-  'Transfers & Payments': [
-    'paynow', 'fast', 'giro', 'paylah', 'transfer', 'payment', 'paymt',
-    'bill payment', 'atm withdrawal', 'cash withdrawal',
-  ],
   'Income': [
     'salary', 'payroll', 'interest', 'dividend', 'bonus', 'credit interest',
     'rebate', 'cashback', 'refund',
+  ],
+  'Transfers & Payments': [
+    'paynow', 'fast', 'giro', 'paylah', 'transfer', 'payment', 'paymt',
+    'bill payment', 'atm withdrawal', 'cash withdrawal',
   ],
   'Investments': [
     'brokerage', 'ibkr', 'interactive brokers', 'tiger', 'syfe', 'endowus',
