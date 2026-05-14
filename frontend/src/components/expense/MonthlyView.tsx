@@ -1,0 +1,93 @@
+import { useMemo, useState } from 'react';
+import { Transaction } from '../../types/expense';
+import { monthKey, formatMonthYear } from '../../utils/formatters';
+import { ExpenseChart } from './ExpenseChart';
+import { TransactionList } from './TransactionList';
+import { CATEGORY_KEYWORDS, FALLBACK_CATEGORY } from '../../constants/categoryKeywords';
+
+const ALL_CATEGORIES = [...Object.keys(CATEGORY_KEYWORDS), FALLBACK_CATEGORY];
+
+interface Props {
+  transactions: Transaction[];
+}
+
+export function MonthlyView({ transactions }: Props) {
+  const months = useMemo(() => {
+    const keys = [...new Set(transactions.map(t => monthKey(t.date)))].sort().reverse();
+    return keys;
+  }, [transactions]);
+
+  const [selectedMonth, setSelectedMonth] = useState(() => months[0] ?? '');
+
+  const monthTransactions = useMemo(
+    () => transactions.filter(t => monthKey(t.date) === selectedMonth),
+    [transactions, selectedMonth]
+  );
+
+  const debits = monthTransactions.filter(t => t.type === 'debit');
+  const credits = monthTransactions.filter(t => t.type === 'credit');
+  const totalSpend = debits.reduce((s, t) => s + t.amount, 0);
+  const totalIncome = credits.reduce((s, t) => s + t.amount, 0);
+
+  const chartData = useMemo(() => {
+    const cats: Record<string, number> = {};
+    for (const t of debits) {
+      cats[t.category] = (cats[t.category] ?? 0) + t.amount;
+    }
+    return Object.entries(cats)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [debits]);
+
+  if (months.length === 0) {
+    return <p className="text-sm text-gray-400 text-center py-8">No transactions yet.</p>;
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Month selector */}
+      <div className="flex items-center gap-2">
+        <label className="text-sm text-gray-500">Month:</label>
+        <select
+          value={selectedMonth}
+          onChange={e => setSelectedMonth(e.target.value)}
+          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          {months.map(m => <option key={m} value={m}>{formatMonthYear(m + '-01')}</option>)}
+        </select>
+      </div>
+
+      {/* Summary */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="text-xs text-gray-400 mb-1">Total Spend</div>
+          <div className="text-lg font-semibold text-gray-900">S${totalSpend.toFixed(2)}</div>
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="text-xs text-gray-400 mb-1">Total Income</div>
+          <div className="text-lg font-semibold text-green-600">S${totalIncome.toFixed(2)}</div>
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="text-xs text-gray-400 mb-1">Net</div>
+          <div className={`text-lg font-semibold ${totalIncome - totalSpend >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+            S${(totalIncome - totalSpend).toFixed(2)}
+          </div>
+        </div>
+      </div>
+
+      {/* Chart */}
+      {chartData.length > 0 && (
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <h4 className="text-sm font-medium text-gray-700 mb-2">Spend by Category</h4>
+          <ExpenseChart data={chartData} currency="SGD" />
+        </div>
+      )}
+
+      {/* Transaction list */}
+      <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <h4 className="text-sm font-medium text-gray-700 mb-3">Transactions</h4>
+        <TransactionList transactions={monthTransactions} />
+      </div>
+    </div>
+  );
+}
