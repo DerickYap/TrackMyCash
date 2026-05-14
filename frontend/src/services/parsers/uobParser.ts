@@ -2,6 +2,8 @@ import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
 import { RawTransaction } from '../../types/expense';
 import { parseUOBCreditPdf } from './uobCreditPdfParser';
+import { parseUOBBankPdf } from './uobBankPdfParser';
+import { extractFirstPageText } from './pdfUtils';
 
 const SKIP_DESCRIPTIONS = ['balance b/f', 'balance c/f'];
 
@@ -82,6 +84,12 @@ export async function parseUOB(
   const name = file.name.toLowerCase();
 
   if (name.endsWith('.pdf')) {
+    const firstPage = await extractFirstPageText(file);
+    const lower = firstPage.toLowerCase();
+    // Bank account statements have Withdrawals/Deposits columns; CC statements do not
+    if (lower.includes('withdrawals') || lower.includes('balance b/f')) {
+      return parseUOBBankPdf(file);
+    }
     return parseUOBCreditPdf(file);
   }
 
