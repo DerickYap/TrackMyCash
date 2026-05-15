@@ -83,7 +83,7 @@ Parsers in `frontend/src/services/parsers/`:
 | Bank | CSV/XLS file | PDF file |
 |------|-------------|----------|
 | DBS | `dbsParser.ts` | `dbsPdfParser.ts` — auto-detects CC vs bank account; column x-coords distinguish withdrawal/deposit |
-| UOB | `uobParser.ts` (XLS + CSV) | `uobCreditPdfParser.ts` — credit card PDF only |
+| UOB | `uobParser.ts` (XLS + CSV) | `uobCreditPdfParser.ts` (CC) + `uobBankPdfParser.ts` (One Account/savings) — detected by "statement of account" on page 1 |
 | Chase | `chaseParser.ts` | `chasePdfParser.ts` |
 | Amex | `amexParser.ts` (SGD or USD selectable) | `amexPdfParser.ts` — handles SGD `DD Mon` and USD `MM/DD/YY` formats |
 | BofA | `bofaParser.ts` | `bofaPdfParser.ts` — auto-detects CC vs bank account |
@@ -181,8 +181,9 @@ track-my-cash/
         ├── services/parsers/
         │   ├── pdfUtils.ts               ← shared pdfjs-dist extraction (extractRows, extractLines, extractFirstPageText)
         │   ├── detectBank.ts             ← auto-detects bank from PDF text / CSV headers
-        │   ├── uobParser.ts              ← routes PDF→uobCreditPdfParser, XLS, CSV
+        │   ├── uobParser.ts              ← routes PDF→CC or bank parser; handles XLS + CSV
         │   ├── uobCreditPdfParser.ts     ← UOB CC PDF (uses pdfUtils)
+        │   ├── uobBankPdfParser.ts       ← UOB One Account / savings PDF (balance-direction debit/credit)
         │   ├── chasePdfParser.ts         ← Chase CC PDF
         │   ├── dbsPdfParser.ts           ← DBS CC + bank account PDF
         │   ├── amexPdfParser.ts          ← Amex CC PDF (SGD + USD)
@@ -215,3 +216,9 @@ track-my-cash/
 - **Import JSON race condition (fixed)**: `SettingsPanel` now `await`s the Supabase upsert before calling `window.location.reload()` — previously the reload happened before the write completed.
 - **PDF year detection**: parsers only extract years from date-like contexts (month name + year, or `MM/DD/YYYY`). Raw numbers like zip codes (`75267-2050`) or account numbers won't be misread as years.
 - **Two-month billing cycles**: all PDF parsers extract the statement closing month alongside the year. Each transaction is assigned to the correct year via `assignYear(txMonth, endYear, endMonth)` — same logic UOB has always used.
+- **UOB bank account PDF detection**: `extractFirstPageText` only reads page 1. The "Withdrawals" column header is on page 2 of UOB bank statements, so detection uses `"statement of account"` (page 1 title) instead.
+- **UOB bank account debit/credit**: determined by balance direction — if the running balance goes up, it's a credit; if it goes down, it's a debit. More reliable than x-coordinate column matching for this layout.
+- **Transfers & Payments excluded from both spend and income**: CC bill payments from bank account statements are `type: 'debit'` but not real spending; GIRO payments received on CC statements are `type: 'credit'` but not income. Both are filtered in `MonthlyView.tsx`.
+- **Category priority — Income before Transfers & Payments**: Salary GIRO descriptions contain both `giro` and `salary`/`payroll`. `CATEGORY_KEYWORDS` object order determines match priority; Income is listed first so salary keywords win before `giro` matches.
+- **`paymt` keyword**: UOB abbreviates "PAYMENT" as "PAYMT" in bank account descriptions (e.g. `PAYMT THRU E-BANK`). Added to Transfers & Payments keywords.
+- **CC payment skip lines**: DBS and UOB CC parsers skip `payment received`, `autopay`, `auto pay` lines at parse time, matching Chase/Amex behavior — these entries never appear in the transaction list.
