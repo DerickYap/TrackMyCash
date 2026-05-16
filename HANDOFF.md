@@ -5,12 +5,15 @@ Personal finance web app. React + Vite + TypeScript + Tailwind v4 frontend. Node
 
 **Dev commands:**
 ```bash
-# Terminal 1 — backend
-cd backend && npm run dev        # runs on localhost:3001
+# Option A — Vercel CLI (recommended, tests API functions locally too)
+cd frontend && vercel dev        # runs frontend + API functions together
 
-# Terminal 2 — frontend
-cd frontend && npm run dev       # runs on localhost:5173
+# Option B — two terminals (no Vercel CLI needed)
+cd backend && npm run dev        # Express backend on localhost:3001
+cd frontend && npm run dev       # Vite frontend on localhost:5173 (proxies /api → 3001)
 ```
+
+**Production deploy:** Vercel. Set **Root Directory → `frontend`** in the Vercel dashboard. The `frontend/vercel.json` handles the rest (installs from monorepo root, Vite framework).
 
 **Required env file:** `frontend/.env.local` (see `frontend/.env.local.example`)
 ```
@@ -99,18 +102,13 @@ Parsers in `frontend/src/services/parsers/`:
 - `SettingsPanel` — proxy URL, FX override, JSON export/import (awaits Supabase write before reload), clear data (double-confirm, also clears Supabase)
 - `SpreadsheetImportModal` — imports from the user's specific Google Sheets CSV column layout (col 2-3: summary, col 5-7: individual assets, col 9-11: Robinhood, col 14-16: 401k, col 19-21: IBKR)
 
-### Backend Routes
-- `GET /health` — health check
-- `GET /api/quote?symbol=` — fetches quote via `yahoo-finance2` (`new YahooFinance()`)
-- `GET /api/search?query=` — searches symbols via `yahoo-finance2`
+### API Routes (Vercel Functions)
+- `GET /api/quote?symbol=` — `frontend/api/quote.ts` — fetches quote via `yahoo-finance2`
+- `GET /api/search?query=` — `frontend/api/search.ts` — searches symbols via `yahoo-finance2`
 
 **No API key required.** `yahoo-finance2` handles cookie/crumb auth internally.
 
-### macOS Desktop Launcher ✅
-- `start.command` — double-click from Finder to start the app
-- Uses `ts-node` to compile backend in memory (avoids macOS EPERM on compiled dist files)
-- Builds frontend if `dist/` is missing, then serves via Express on port 3001
-- **Known issue**: macOS restricts Node.js file access for apps launched from `~/Documents`. Move the project to `~/Projects/` or similar, or grant Terminal Full Disk Access in System Settings → Privacy & Security.
+In production these are Vercel serverless functions. For local dev, `vercel dev` serves them alongside the Vite frontend, or the Express `backend/` can be used as a fallback (Vite proxy points to `localhost:3001`).
 
 ---
 
