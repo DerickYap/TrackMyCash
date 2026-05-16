@@ -82,21 +82,42 @@ CREATE TABLE user_data (
 - Metals: gold `GC=F`, silver `SI=F` via yahoo-finance2 (futures, tracks spot price)
 
 ### Expense Module ✅
+
+**Import flow (2026-05-16 redesign):** User drops any file → `parseFile.ts` detects and routes silently → ReviewScreen. No bank selector shown to user.
+
+```
+File selected
+  ├── JPG/PNG → ImageReceiptScreen (view image + manual form)
+  ├── Known bank PDF/CSV/XLS → bank-specific parser (better accuracy)
+  ├── Unrecognised PDF → genericPdfParser (best-effort date/amount/merchant)
+  └── Unrecognised CSV/XLS → error (no generic tabular parser yet)
+```
+
+**`parseFile.ts`** — single entry point for all non-image files. Calls `detectBank`, routes to correct parser, runs `normaliseTransactions`, returns `Transaction[]`. Handles Amex currency auto-detection from date format.
+
+**`ImageReceiptScreen.tsx`** — two-column layout: image on left, manual entry form on right. Submits via `ADD_TRANSACTION` directly (bypasses normaliser). `ExpenseTab` checks for duplicates before dispatching.
+
+**`genericPdfParser.ts`** — extracts from any PDF: largest amount on "total" lines, first date match, first non-numeric line as merchant. Returns a single `RawTransaction` for user to correct in ReviewScreen.
+
 Parsers in `frontend/src/services/parsers/`:
 | Bank | CSV/XLS file | PDF file |
 |------|-------------|----------|
 | DBS | `dbsParser.ts` | `dbsPdfParser.ts` — auto-detects CC vs bank account; column x-coords distinguish withdrawal/deposit |
 | UOB | `uobParser.ts` (XLS + CSV) | `uobCreditPdfParser.ts` (CC) + `uobBankPdfParser.ts` (One Account/savings) — detected by "statement of account" on page 1 |
 | Chase | `chaseParser.ts` | `chasePdfParser.ts` |
-| Amex | `amexParser.ts` (SGD or USD selectable) | `amexPdfParser.ts` — handles SGD `DD Mon` and USD `MM/DD/YY` formats |
+| Amex | `amexParser.ts` | `amexPdfParser.ts` — handles SGD `DD Mon` and USD `MM/DD/YY` formats; currency auto-detected from date format |
 | BofA | `bofaParser.ts` | `bofaPdfParser.ts` — auto-detects CC vs bank account |
 
-- `pdfUtils.ts` — shared pdfjs-dist text extraction used by all PDF parsers (`extractRows`, `extractLines`, `extractFirstPageText`)
-- `detectBank.ts` — auto-detects bank from file content: PDFs scan first-page text for bank name; CSVs fingerprint header row; XLS converted to CSV first
-- All PDF parsers handle **two-month billing cycles** (e.g. Dec 8 → Jan 7): extracts statement closing month + year, assigns each transaction to the correct year using the same `assignYear` logic as UOB
-- `normaliser.ts` — bank-agnostic: assigns UUID, normalises dates, deduplicates, auto-categorises
-- `UploadArea` — file picker → auto-detect → show detected bank (overridable) → Import
-- `MonthlyView` + `ExpenseChart` (Recharts donut) + `TransactionList`
+- `pdfUtils.ts` — shared pdfjs-dist text extraction (`extractRows`, `extractLines`, `extractFirstPageText`)
+- `detectBank.ts` — returns `DetectionResult` (`bank/generic-pdf/image/unknown`); PDFs scan first-page text; CSVs fingerprint header; XLS scans full CSV content
+- All PDF parsers handle **two-month billing cycles**: extracts statement closing month + year, assigns correct year via `assignYear`
+- `normaliser.ts` — bank-agnostic: UUID, date normalisation, dedup against existing + intra-batch, auto-categorise
+- `MonthlyView` + `ExpenseChart` (Recharts donut, excludes Transfers & Payments) + `TransactionList`
+
+**Duplicate handling:**
+- `normaliser.ts` deduplicates against both existing transactions AND the current import batch (intra-batch)
+- `ReviewScreen` shows skipped duplicates in a collapsible yellow section with an "Include" button to recover false positives
+- Image receipt path (`ExpenseTab`) checks for duplicates before `ADD_TRANSACTION` and prompts for confirmation if found
 
 ### Settings & Import ✅
 - `SettingsPanel` — proxy URL, FX override, JSON export/import (awaits Supabase write before reload), clear data (double-confirm, also clears Supabase)
@@ -132,7 +153,7 @@ Default return rates are in `frontend/src/constants/defaultReturnRates.ts`. The 
 The `categories` column exists in the `user_data` Supabase table (JSONB `string[]`) but the UI to create/rename/delete categories hasn't been built yet. Currently, categories are auto-assigned by the normaliser and edited per-transaction. The `category_memory` column remembers past assignments for auto-categorisation.
 
 ### ✅ Bank Statement Auto-Detection (done)
-`detectBank.ts` fingerprints the file on upload — no manual bank selection needed. PDFs scan first-page text; CSVs check the header row. The detected bank shows in a dropdown the user can override if detection fails.
+`detectBank.ts` returns a `DetectionResult` discriminated union. Detection runs silently — no bank dropdown is shown to the user. Bank-specific parsers run under the hood for known formats; unrecognised PDFs fall back to `genericPdfParser`.
 
 ### 🟡 Design System Migration (packages/ui)
 The `packages/ui` package is set up with components and tokens but the existing app components haven't been migrated yet to use them. Migration order when ready:
@@ -178,13 +199,16 @@ track-my-cash/
         ├── services/api/frankfurter.ts   ← FX rate fetch
         ├── services/parsers/
         │   ├── pdfUtils.ts               ← shared pdfjs-dist extraction (extractRows, extractLines, extractFirstPageText)
-        │   ├── detectBank.ts             ← auto-detects bank from PDF text / CSV headers
-        │   ├── uobParser.ts              ← routes PDF→CC or bank parser; handles XLS + CSV
+        │   ├── detectBank.ts             ← returns DetectionResult; PDFs scan first-page text; XLS scans full CSV content
+        │   ├── parseFile.ts              ← unified entry point: detect → route → normalise → Transaction[]
+        │   ├── genericPdfParser.ts       ← best-effort single-transaction extraction for non-bank PDFs
+        │   ├── normaliser.ts             ← UUID, date normalisation, intra-batch + existing dedup, auto-categorise
+        │   ├── uobParser.ts              ← routes PDF→CC or bank parser; XLS routes CC card vs bank account format
         │   ├── uobCreditPdfParser.ts     ← UOB CC PDF (uses pdfUtils)
         │   ├── uobBankPdfParser.ts       ← UOB One Account / savings PDF (balance-direction debit/credit)
         │   ├── chasePdfParser.ts         ← Chase CC PDF
         │   ├── dbsPdfParser.ts           ← DBS CC + bank account PDF
-        │   ├── amexPdfParser.ts          ← Amex CC PDF (SGD + USD)
+        │   ├── amexPdfParser.ts          ← Amex CC PDF (SGD + USD auto-detected)
         │   └── bofaPdfParser.ts          ← BofA CC + bank account PDF
         └── components/
             ├── auth/LoginPage.tsx        ← Google sign-in page
@@ -194,7 +218,14 @@ track-my-cash/
             ├── layout/SpreadsheetImportModal.tsx
             ├── networth/NetworthTab.tsx
             ├── networth/AllocationChart.tsx
-            └── networth/modals/HoldingEntryForm.tsx
+            ├── networth/modals/HoldingEntryForm.tsx
+            └── expense/
+                ├── ExpenseTab.tsx        ← orchestrates upload/image/review/monthly views
+                ├── UploadArea.tsx        ← file picker + parsing spinner + year prompt (no bank selector)
+                ├── ImageReceiptScreen.tsx← image on left, manual form on right; duplicate check before ADD_TRANSACTION
+                ├── ReviewScreen.tsx      ← table + collapsible skipped-duplicates section with Include button
+                ├── MonthlyView.tsx       ← month selector (syncs after cloud load), summary, chart, transaction list
+                └── TransactionList.tsx   ← search + category filter + inline category editor
 ```
 
 ---
@@ -231,3 +262,10 @@ track-my-cash/
 - **Category priority — Income before Transfers & Payments**: Salary GIRO descriptions contain both `giro` and `salary`/`payroll`. `CATEGORY_KEYWORDS` object order determines match priority; Income is listed first so salary keywords win before `giro` matches.
 - **`paymt` keyword**: UOB abbreviates "PAYMENT" as "PAYMT" in bank account descriptions (e.g. `PAYMT THRU E-BANK`). Added to Transfers & Payments keywords.
 - **CC payment skip lines**: DBS and UOB CC parsers skip `payment received`, `autopay`, `auto pay` lines at parse time, matching Chase/Amex behavior — these entries never appear in the transaction list.
+- **UOB credit card XLS format**: different column structure from bank account XLS — uses `transaction date` and `transaction amount(local)` instead of `withdrawal`/`deposit`. `uobParser.ts` detects which format via header scan and routes to `parseUOBCreditCardXLS` or `parseRows` accordingly. Descriptions have trailing merchant location (e.g. `singapore   sg`) stripped automatically.
+- **UOB XLS detection**: scans the full CSV content for `withdrawal` OR `united overseas bank` — the credit card XLS has the bank name in metadata rows, not a withdrawal column.
+- **Amex currency auto-detection**: `parseFile.ts` checks whether the file contains `MM/DD/YY` date patterns before calling the parser. Present → USD; absent → SGD. The PDF parser also detects this internally per-line, so SGD and USD transactions can coexist in the same file if needed.
+- **genericPdfParser amount heuristic**: prefers lines containing "total"/"amount due"/"grand total" for the amount; falls back to largest value under 100,000. Fails gracefully (returns zeroed stub) if no amount found — user corrects in ReviewScreen.
+- **MonthlyView cloud load**: `selectedMonth` state is initialised from `months[0]` on mount. On a new device with no localStorage, this is `''`. A `useEffect` syncs it when months become available after Supabase loads.
+- **Transfers & Payments excluded from chart**: `ExpenseChart` data excludes this category to match the `totalSpend` headline figure — previously the chart showed a T&P slice that didn't add up to the displayed total.
+- **Deferred dedup gaps**: (1) fuzzy description mismatches — same transaction from CC vs bank account statement won't be caught by exact-match dedup; (2) CC payment appearing on both sides — handled correctly by T&P exclusion, not a real problem. See `memory/project_deferred_dedup.md`.
