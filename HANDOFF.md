@@ -174,7 +174,7 @@ track-my-cash/
         ├── store/AuthContext.tsx          ← Google OAuth auth state (AuthProvider, useAuth)
         ├── store/AppContext.tsx           ← 4 context slices + SyncContext, cloud sync
         ├── hooks/usePriceRefresh.ts      ← staggered 800ms between requests
-        ├── services/cloudStorage.ts      ← fetchUserData, upsertUserData
+        ├── services/cloudStorage.ts      ← fetchUserData, upsertUserData (both wrapped in try/catch with console.error)
         ├── services/api/twelveData.ts    ← fetchQuote, searchStocks (yahoo-finance2 responses)
         ├── services/api/coinGecko.ts     ← fetchCryptoPrices, searchCoinGecko
         ├── services/api/frankfurter.ts   ← FX rate fetch
@@ -201,6 +201,16 @@ track-my-cash/
 
 ---
 
+## Performance Patterns (established 2026-05-16)
+- **React.memo**: `CategoryGroup`, `EntryRow`, `TransactionList` are all wrapped — new list-item components should be too
+- **useMemo**: group/sort derivations in `NetworthTab`, totals in `MonthlyView`, filtered list in `TransactionList` — any expensive derivation in render should be memoized
+- **useCallback**: all handlers passed as props in `NetworthTab` use `useCallback` — keeps memoized children from re-rendering
+- **UPDATE_PRICES**: uses a `Map` for O(n) lookups — don't revert to `.find()` inside `.map()`
+- **ALL_CATEGORIES**: exported from `constants/categoryKeywords.ts` — don't redefine it locally in components
+- **cloudStorage error handling**: both `fetchUserData` and `upsertUserData` have try/catch + `console.error` — new Supabase calls should follow the same pattern
+
+---
+
 ## Known Gotchas
 - **Tailwind v4** uses `@import "tailwindcss"` in CSS and `@tailwindcss/vite` plugin — NOT `@tailwind base/components/utilities` or PostCSS config
 - **UOB credit card PDF** columns: Post Date | Trans Date | Description | Amount (CR suffix = credit). Year extracted from "Statement Date DD MMM YYYY" on page 1
@@ -218,6 +228,8 @@ track-my-cash/
 - **Two-month billing cycles**: all PDF parsers extract the statement closing month alongside the year. Each transaction is assigned to the correct year via `assignYear(txMonth, endYear, endMonth)` — same logic UOB has always used.
 - **UOB bank account PDF detection**: `extractFirstPageText` only reads page 1. The "Withdrawals" column header is on page 2 of UOB bank statements, so detection uses `"statement of account"` (page 1 title) instead.
 - **UOB bank account debit/credit**: determined by balance direction — if the running balance goes up, it's a credit; if it goes down, it's a debit. More reliable than x-coordinate column matching for this layout.
+- **useFxRate dependency**: `useEffect` depends on `state.fxFetchedAt` and `state.fxSource` — if you see the FX rate not refreshing after login, check these deps haven't been removed.
+- **AppContext debounce cleanup**: `debounceRef` timers are cleared on unmount via a `useEffect` cleanup — keeps pending debounces from firing on a dead component.
 - **Transfers & Payments excluded from both spend and income**: CC bill payments from bank account statements are `type: 'debit'` but not real spending; GIRO payments received on CC statements are `type: 'credit'` but not income. Both are filtered in `MonthlyView.tsx`.
 - **Category priority — Income before Transfers & Payments**: Salary GIRO descriptions contain both `giro` and `salary`/`payroll`. `CATEGORY_KEYWORDS` object order determines match priority; Income is listed first so salary keywords win before `giro` matches.
 - **`paymt` keyword**: UOB abbreviates "PAYMENT" as "PAYMT" in bank account descriptions (e.g. `PAYMT THRU E-BANK`). Added to Transfers & Payments keywords.
