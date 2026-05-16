@@ -175,7 +175,7 @@ track-my-cash/
         ├── store/AppContext.tsx           ← 4 context slices + SyncContext, cloud sync
         ├── hooks/usePriceRefresh.ts      ← staggered 800ms between requests
         ├── services/cloudStorage.ts      ← fetchUserData, upsertUserData (both wrapped in try/catch with console.error)
-        ├── services/api/twelveData.ts    ← fetchQuote, searchStocks (yahoo-finance2 responses)
+        ├── services/api/yahooFinance.ts  ← fetchQuote, searchStocks, fetchQuotes (yahoo-finance2 proxy)
         ├── services/api/coinGecko.ts     ← fetchCryptoPrices, searchCoinGecko
         ├── services/api/frankfurter.ts   ← FX rate fetch
         ├── services/parsers/
@@ -218,7 +218,6 @@ track-my-cash/
 - **Metal values**: stored as original weight + unit; converted to troy oz at display time via `toTroyOz()` in `metalConversion.ts`. Price source is `GC=F` (gold) and `SI=F` (silver) futures — tracks spot closely
 - **Metal tickers in localStorage**: existing entries saved before this session may have `ticker: 'XAU/USD'` or `'XAG/USD'`. Price refresh still works because `usePriceRefresh` derives the Yahoo ticker from `metalType`, not the stored ticker value
 - **yahoo-finance2 v3 API**: must use `new YahooFinance()` — the old singleton default export no longer works (throws "Call new YahooFinance() first")
-- **`services/api/twelveData.ts`**: filename is a misnomer — it now parses yahoo-finance2 responses. Rename to `yahooFinance.ts` when convenient (2 import sites: `HoldingEntryForm.tsx`, `usePriceRefresh.ts`)
 - **Projection tab**: wired in App.tsx, currently renders a placeholder `<div>`
 - **Frankfurter CORS on localhost**: `api.frankfurter.app` blocks direct browser requests from localhost in some configurations. FX rate fetch may silently fail in dev; falls back to stored rate. Works fine in production.
 - **npm workspaces + Vite hoisting**: React gets hoisted to root `node_modules` by npm. `vite.config.ts` has explicit `resolve.alias` entries pointing to `../node_modules/react` to fix Vite's Rolldown optimizer. If you add new packages and see "cannot find react", run `npm install` from the repo root.
