@@ -1,47 +1,102 @@
+// Keywords are checked with substring match in the order listed.
+// Put longer/more-specific strings before shorter ones that would shadow them
+// (e.g. 'grab food' before 'grab', 'amazon prime' before 'amazon').
 export const CATEGORY_KEYWORDS: Record<string, string[]> = {
   'Food & Dining': [
-    'grab food', 'grabfood', 'deliveroo', 'foodpanda', "mcdonald's", 'mcdonalds',
-    'kopitiam', 'fairprice', 'hawker', 'restaurant', 'cafe', 'coffee', 'bread',
-    'starbucks', 'toast box', 'old chang kee', 'bengawan solo', 'bengawan',
-    'burger king', 'kfc', 'subway', 'pizza', 'sushi', 'ramen', 'food',
+    // Delivery — must come before plain 'grab' / 'uber'
+    'grab food', 'grabfood', 'grab*food', 'foodpanda', 'deliveroo',
+    'uber eats', 'ubereats', 'doordash', 'postmates',
+    // Coffee
+    'starbucks', 'coffee bean', 'dutch colony', 'dunkin',
+    // Chains — SG
+    "mcdonald's", 'mcdonalds', 'burger king', 'subway', 'kfc',
+    'toast box', 'toastbox', 'kopitiam', 'old chang kee',
+    'bengawan solo', 'bread talk', 'breadtalk', 'ya kun',
+    'mos burger', 'jollibee', 'pepper lunch', 'saizeriya',
+    'crystal jade', 'din tai fung', 'swensen', 'shake shack',
+    'hawker', 'food court', 'canteen',
+    // Chains — US
+    'chipotle', 'chick-fil-a', 'chickfila', 'panera', 'taco bell',
+    "wendy's", 'wendys', 'dominos', "domino's", 'five guys', 'panda express',
+    // Generic
+    'restaurant', 'cafe', 'coffee', 'pizza', 'sushi', 'ramen',
+    'eatery', 'bistro', 'bakery',
+  ],
+  'Groceries': [
+    // SG
+    'meidi-ya', 'fairprice', 'cold storage', 'sheng siong',
+    'prime supermarket', 'giant hypermart', 'giant hypermarket',
+    'jasons', 'redmart', 'marketplace by',
+    // US
+    'whole foods', 'trader joe', 'safeway', 'kroger', 'costco',
+    'publix', 'aldi', 'h mart', 'hmart', 'sprouts', 'wegmans',
+    // Generic
+    'supermarket', 'hypermarket', 'grocery', 'provisions', 'wet market',
   ],
   'Transport': [
-    'grab', 'comfortdelgro', 'comfort delgro', 'smrt', 'ez-link', 'ezlink',
-    'gojek', 'ryde', 'taxi', 'mrt', 'bus', 'grab express', 'tada',
+    // Ride-hail — 'grab' after grabfood variants above
+    'grab', 'gojek', 'comfortdelgro', 'comfort delgro', 'smrt',
+    'ez-link', 'ezlink', 'transitlink', 'ryde',
+    'uber', 'lyft', 'zipcar',
+    'hdb car park', 'ura carpark',
+    // Generic
+    'taxi', 'mrt', 'bus', 'parking', 'toll', 'petrol', 'fuel', 'car park',
   ],
   'Utilities & Bills': [
-    'sp group', 'singtel', 'starhub', 'm1', 'pub', 'town council', 'sp services',
-    'electricity', 'water', 'gas',
+    'sp group', 'sp services', 'singtel', 'starhub', 'm1 limited',
+    'circles.life', 'town council', 'conservancy',
+    'electricity', 'water', 'gas', 'broadband',
   ],
   'Shopping': [
-    'shopee', 'lazada', 'amazon', 'ntuc', 'cold storage', 'giant', 'uniqlo',
-    'zara', 'h&m', 'ikea', 'courts', 'best denki', 'harvey norman', 'challenger',
-    'daiso', 'donki', 'don don donki', 'watsons', 'guardian',
+    // Must come after 'amazon prime' in Subscriptions — order between categories
+    // doesn't matter since categories are checked in insertion order and
+    // 'Subscriptions' is listed after 'Shopping'. So put 'amazon prime' first
+    // inside Subscriptions to ensure it wins.
+    'shopee', 'lazada', 'amazon',
+    'uniqlo', 'zara', 'h&m', 'ikea',
+    'courts', 'best denki', 'harvey norman', 'challenger',
+    'daiso', 'don don donki', 'donki',
+    'watsons', 'guardian', 'muji',
+    // US
+    'walmart', 'target', 'best buy', 'ebay', 'etsy', 'nordstrom', 'old navy',
+    // Generic
+    'retail', 'boutique',
   ],
   'Travel': [
-    'singapore airlines', 'scoot', 'changi airport', 'airbnb', 'booking.com',
-    'expedia', 'hotels', 'agoda', 'klook', 'jetstar', 'cathay', 'hotel',
+    'singapore airlines', 'scoot', 'jetstar', 'airasia', 'cathay pacific',
+    'changi airport', 'airbnb', 'booking.com', 'agoda', 'expedia', 'klook',
+    'hotel', 'hostel', 'resort', 'airlines', 'flight', 'ferry', 'airport',
   ],
   'Healthcare': [
-    'raffles medical', 'parkway', 'clinic', 'pharmacy', 'hospital',
-    'polyclinic', 'dentist', 'dental', 'vision', 'optical',
+    'raffles medical', 'raffles hospital', 'raffles health',
+    'parkway', 'mount elizabeth', 'gleneagles', 'polyclinic',
+    'ntuc unity', 'guardian pharmacy',
+    'cvs', 'walgreens', 'rite aid',
+    'clinic', 'pharmacy', 'hospital', 'dentist', 'dental',
+    'vision', 'optical', 'physiotherapy',
   ],
   'Subscriptions': [
-    'netflix', 'spotify', 'apple', 'google', 'chatgpt', 'adobe', 'microsoft',
-    'icloud', 'youtube', 'disney', 'amazon prime',
+    'amazon prime',   // before 'amazon' in Shopping
+    'netflix', 'spotify', 'apple.com/bill', 'icloud', 'google one',
+    'youtube premium', 'disney+', 'disneyplus',
+    'chatgpt', 'openai', 'claude.ai', 'adobe', 'microsoft 365',
+    'hbo', 'hulu',
+    'subscription', 'membership',
   ],
   'Income': [
     'salary', 'payroll', 'interest', 'dividend', 'bonus', 'credit interest',
     'rebate', 'cashback', 'refund',
   ],
   'Transfers & Payments': [
-    'paynow', 'fast', 'giro', 'paylah', 'transfer', 'payment', 'paymt',
-    'bill payment', 'atm withdrawal', 'cash withdrawal',
+    'paynow', 'paylah', 'giro',
+    'atm withdrawal', 'cash withdrawal',
+    'transfer', 'payment', 'paymt', 'bill payment',
   ],
   'Investments': [
-    'brokerage', 'ibkr', 'interactive brokers', 'tiger', 'syfe', 'endowus',
-    'stashaway', 'moomoo', 'cimb securities', 'dbs vickers', 'uob kay hian',
-    'phillip securities', 'cpf', 'srs',
+    'ibkr', 'interactive brokers', 'tiger brokers', 'moomoo',
+    'syfe', 'endowus', 'stashaway',
+    'dbs vickers', 'uob kay hian', 'phillip securities', 'cimb securities',
+    'brokerage', 'cpf', 'srs',
   ],
 };
 

@@ -23,7 +23,9 @@ export function MonthlyView({ transactions }: Props) {
   }, [months, selectedMonth]);
 
   const monthTransactions = useMemo(
-    () => transactions.filter(t => monthKey(t.date) === selectedMonth),
+    () => transactions
+      .filter(t => monthKey(t.date) === selectedMonth)
+      .sort((a, b) => b.date.localeCompare(a.date)),
     [transactions, selectedMonth]
   );
 
