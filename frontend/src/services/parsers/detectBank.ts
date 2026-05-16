@@ -1,16 +1,21 @@
 import * as XLSX from 'xlsx';
-import { BankSource } from '../../types/expense';
+import { BankSource, DetectionResult } from '../../types/expense';
 import { extractFirstPageText } from './pdfUtils';
 
-export async function detectBank(file: File): Promise<BankSource | null> {
+export async function detectBank(file: File): Promise<DetectionResult> {
   const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+
+  if (ext === 'jpg' || ext === 'jpeg' || ext === 'png') {
+    return { type: 'image' };
+  }
 
   if (ext === 'pdf') {
     try {
       const text = await extractFirstPageText(file);
-      return detectFromPdfText(text);
+      const source = detectFromPdfText(text);
+      return source ? { type: 'bank', source } : { type: 'generic-pdf' };
     } catch {
-      return null;
+      return { type: 'generic-pdf' };
     }
   }
 
@@ -18,22 +23,24 @@ export async function detectBank(file: File): Promise<BankSource | null> {
     const buffer = await file.arrayBuffer();
     const workbook = XLSX.read(buffer, { type: 'array' });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const csv = XLSX.utils.sheet_to_csv(sheet);
-    // UOB XLS has withdrawal/deposit columns; everything else is BofA
-    return detectFromCSVText(csv) === 'UOB' ? 'UOB' : 'BofA';
+    const csv = XLSX.utils.sheet_to_csv(sheet).toLowerCase();
+    // Match both UOB bank account (withdrawal column) and UOB credit card (bank name in header)
+    return csv.includes('withdrawal') || csv.includes('united overseas bank')
+      ? { type: 'bank', source: 'UOB' }
+      : { type: 'unknown' };
   }
 
   if (ext === 'csv') {
-    return detectFromCSVText(await file.text());
+    const source = detectFromCSVText(await file.text());
+    return source ? { type: 'bank', source } : { type: 'unknown' };
   }
 
-  return null;
+  return { type: 'unknown' };
 }
 
 function detectFromPdfText(text: string): BankSource | null {
   const lower = text.toLowerCase();
 
-  // JPMorgan Chase — use distinctive brand terms to avoid false positives on "chase"
   if (
     lower.includes('jpmorgan chase') ||
     lower.includes('chase freedom') ||
@@ -49,7 +56,6 @@ function detectFromPdfText(text: string): BankSource | null {
   if (lower.includes('bank of america')) return 'BofA';
   if (lower.includes('american express')) return 'Amex';
 
-  // DBS — check for bank name or common product names
   if (
     lower.includes('dbs bank') ||
     lower.includes('development bank of singapore') ||
@@ -61,7 +67,6 @@ function detectFromPdfText(text: string): BankSource | null {
     lower.includes('dbs treasures')
   ) return 'DBS';
 
-  // UOB — check for bank name or common product names
   if (
     lower.includes('united overseas bank') ||
     lower.includes('uob one') ||
@@ -79,19 +84,10 @@ function detectFromPdfText(text: string): BankSource | null {
 function detectFromCSVText(text: string): BankSource | null {
   const sample = text.split('\n').slice(0, 10).join('\n').toLowerCase();
 
-  // Chase: uniquely has "post date" alongside "transaction date"
   if (sample.includes('post date')) return 'Chase';
-
-  // DBS: has "transaction date" (but not "post date" — already ruled out above)
   if (sample.includes('transaction date')) return 'DBS';
-
-  // UOB: withdrawal/deposit column headers
   if (sample.includes('withdrawal')) return 'UOB';
-
-  // BofA: bank name in file header or "running bal" column
   if (sample.includes('bank of america') || sample.includes('running bal')) return 'BofA';
-
-  // Amex: bank name in file header
   if (sample.includes('american express') || sample.includes('amex')) return 'Amex';
 
   return null;

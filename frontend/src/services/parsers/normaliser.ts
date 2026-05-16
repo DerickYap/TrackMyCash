@@ -22,13 +22,10 @@ function normaliseDate(raw: string): string {
     return `${dmy[3]}-${m}-${dmy[1].padStart(2, '0')}`;
   }
 
-  // MM/DD/YYYY (Chase, Amex, BofA)
+  // MM/DD/YYYY (Chase, Amex, BofA) — must be checked before DD/MM/YYYY
+  // since the regexes are identical; US banks always use MM/DD so this branch wins
   const mdy = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (mdy) return `${mdy[3]}-${mdy[1].padStart(2, '0')}-${mdy[2].padStart(2, '0')}`;
-
-  // DD/MM/YYYY (UOB with year)
-  const dmy2 = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (dmy2) return `${dmy2[3]}-${dmy2[2].padStart(2, '0')}-${dmy2[1].padStart(2, '0')}`;
 
   return raw; // fallback, leave as-is
 }
@@ -41,11 +38,14 @@ export function normaliseTransactions(
   memory: Record<string, string>
 ): Transaction[] {
   const existingSet = buildDuplicateSet(existing);
+  const batchSet = new Set<string>();
   const now = new Date().toISOString();
 
   return raw.map(r => {
     const date = normaliseDate(r.date);
-    const duplicate = isDuplicate(date, r.description, r.amount, existingSet);
+    const key = `${date}|${r.description.trim()}|${r.amount}`;
+    const duplicate = isDuplicate(date, r.description, r.amount, existingSet) || batchSet.has(key);
+    if (!duplicate) batchSet.add(key);
     const category = assignCategory(r.description, source, memory);
     return {
       id: crypto.randomUUID(),

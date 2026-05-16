@@ -1,10 +1,8 @@
 import { useState } from 'react';
 import { Transaction, TransactionType } from '../../types/expense';
 import { Currency } from '../../types/networth';
-import { CATEGORY_KEYWORDS, FALLBACK_CATEGORY } from '../../constants/categoryKeywords';
+import { ALL_CATEGORIES, FALLBACK_CATEGORY } from '../../constants/categoryKeywords';
 import { useExpense } from '../../store/AppContext';
-
-const ALL_CATEGORIES = [...Object.keys(CATEGORY_KEYWORDS), FALLBACK_CATEGORY];
 
 interface Props {
   onClose: () => void;

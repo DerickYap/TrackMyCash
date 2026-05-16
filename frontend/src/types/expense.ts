@@ -1,7 +1,13 @@
 import { Currency } from './networth';
 
-export type BankSource = 'DBS' | 'UOB' | 'Chase' | 'Amex' | 'BofA' | 'manual';
+export type BankSource = 'DBS' | 'UOB' | 'Chase' | 'Amex' | 'BofA' | 'manual' | 'receipt' | 'generic';
 export type TransactionType = 'debit' | 'credit';
+
+export type DetectionResult =
+  | { type: 'bank'; source: BankSource }
+  | { type: 'generic-pdf' }
+  | { type: 'image' }
+  | { type: 'unknown' };
 
 export interface Transaction {
   id: string;

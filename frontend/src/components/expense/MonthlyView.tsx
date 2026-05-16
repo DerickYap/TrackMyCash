@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Transaction } from '../../types/expense';
 import { monthKey, formatMonthYear } from '../../utils/formatters';
 import { ExpenseChart } from './ExpenseChart';
@@ -16,6 +16,11 @@ export function MonthlyView({ transactions }: Props) {
   }, [transactions]);
 
   const [selectedMonth, setSelectedMonth] = useState(() => months[0] ?? '');
+
+  // Sync selectedMonth when transactions load from cloud on a fresh device
+  useEffect(() => {
+    if (!selectedMonth && months.length > 0) setSelectedMonth(months[0]);
+  }, [months, selectedMonth]);
 
   const monthTransactions = useMemo(
     () => transactions.filter(t => monthKey(t.date) === selectedMonth),
@@ -39,6 +44,7 @@ export function MonthlyView({ transactions }: Props) {
   const chartData = useMemo(() => {
     const cats: Record<string, number> = {};
     for (const t of debits) {
+      if (t.category === 'Transfers & Payments') continue;
       cats[t.category] = (cats[t.category] ?? 0) + t.amount;
     }
     return Object.entries(cats)

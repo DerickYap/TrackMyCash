@@ -1,10 +1,8 @@
 import { useState } from 'react';
 import { Transaction } from '../../types/expense';
 import { useExpense } from '../../store/AppContext';
-import { CATEGORY_KEYWORDS, FALLBACK_CATEGORY } from '../../constants/categoryKeywords';
+import { ALL_CATEGORIES } from '../../constants/categoryKeywords';
 import { formatDate } from '../../utils/formatters';
-
-const ALL_CATEGORIES = [...Object.keys(CATEGORY_KEYWORDS), FALLBACK_CATEGORY];
 
 interface Props {
   transactions: Transaction[];
@@ -15,14 +13,21 @@ interface Props {
 export function ReviewScreen({ transactions, onConfirm, onCancel }: Props) {
   const { dispatch } = useExpense();
   const [local, setLocal] = useState<Transaction[]>(transactions.filter(t => !t.isDuplicate));
-  const duplicates = transactions.filter(t => t.isDuplicate);
+  const [skipped, setSkipped] = useState<Transaction[]>(transactions.filter(t => t.isDuplicate));
+  const [skippedOpen, setSkippedOpen] = useState(false);
 
   function updateCategory(id: string, category: string) {
     setLocal(prev => prev.map(t => t.id === id ? { ...t, category } : t));
   }
 
+  function includeSkipped(id: string) {
+    const tx = skipped.find(t => t.id === id);
+    if (!tx) return;
+    setLocal(prev => [...prev, { ...tx, isDuplicate: false }]);
+    setSkipped(prev => prev.filter(t => t.id !== id));
+  }
+
   function handleConfirm() {
-    // Persist category corrections to memory
     for (const t of local) {
       const original = transactions.find(o => o.id === t.id);
       if (original && original.category !== t.category) {
@@ -42,7 +47,14 @@ export function ReviewScreen({ transactions, onConfirm, onCancel }: Props) {
           <h3 className="text-sm font-semibold text-gray-700">Review Import</h3>
           <p className="text-xs text-gray-400 mt-0.5">
             {local.length} transactions to import
-            {duplicates.length > 0 && ` · ${duplicates.length} duplicates skipped`}
+            {skipped.length > 0 && (
+              <button
+                onClick={() => setSkippedOpen(o => !o)}
+                className="ml-1 text-amber-600 hover:text-amber-700 underline"
+              >
+                · {skipped.length} duplicate{skipped.length > 1 ? 's' : ''} skipped — review
+              </button>
+            )}
           </p>
         </div>
         <div className="flex gap-2">
@@ -88,6 +100,35 @@ export function ReviewScreen({ transactions, onConfirm, onCancel }: Props) {
           </tbody>
         </table>
       </div>
+
+      {skipped.length > 0 && skippedOpen && (
+        <div className="border-t border-amber-100 bg-amber-50">
+          <div className="px-4 py-2 text-xs font-medium text-amber-700">
+            Skipped duplicates — click Include to add anyway
+          </div>
+          <table className="w-full text-sm">
+            <tbody className="divide-y divide-amber-100">
+              {skipped.map(t => (
+                <tr key={t.id}>
+                  <td className="px-4 py-2 text-gray-400 whitespace-nowrap w-24">{formatDate(t.date)}</td>
+                  <td className="px-4 py-2 text-gray-500 max-w-xs truncate">{t.description}</td>
+                  <td className="px-4 py-2 text-right whitespace-nowrap text-gray-500 w-24">
+                    {t.currency === 'SGD' ? 'S$' : 'US$'}{t.amount.toFixed(2)}
+                  </td>
+                  <td className="px-4 py-2 w-24">
+                    <button
+                      onClick={() => includeSkipped(t.id)}
+                      className="text-xs px-2 py-1 border border-amber-400 text-amber-700 rounded hover:bg-amber-100"
+                    >
+                      Include
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
