@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { HoldingEntry, AssetClass, MetalType, WeightUnit, Currency } from '../../../types/networth';
-import { fetchQuote, searchStocks, StockSuggestion } from '../../../services/api/twelveData';
+import { fetchQuote, searchStocks, StockSuggestion } from '../../../services/api/yahooFinance';
 import { fetchCryptoPrices, searchCoinGecko } from '../../../services/api/coinGecko';
 
 interface Props {

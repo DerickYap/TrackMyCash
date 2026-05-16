@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNetworth } from '../store/AppContext';
 import { HoldingEntry } from '../types/networth';
-import { fetchQuotes } from '../services/api/twelveData';
+import { fetchQuotes } from '../services/api/yahooFinance';
 import { fetchCryptoPrices } from '../services/api/coinGecko';
 import { toTroyOz } from '../utils/metalConversion';
 import { PriceUpdate } from '../types/networth';
