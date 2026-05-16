@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { EntryUnion, HoldingEntry, Currency } from '../../types/networth';
 import { formatCurrency, convertToDisplay } from '../../utils/currency';
 import { toTroyOz } from '../../utils/metalConversion';
@@ -19,7 +20,7 @@ interface Props {
   onDelete: (id: string) => void;
 }
 
-export function EntryRow({ entry, displayCurrency, fxRate, onEdit, onDelete }: Props) {
+export const EntryRow = memo(function EntryRow({ entry, displayCurrency, fxRate, onEdit, onDelete }: Props) {
   const isHolding = entry.entryType === 'holding';
   const h = isHolding ? (entry as HoldingEntry) : null;
   const nativeValue = isHolding
@@ -98,4 +99,4 @@ export function EntryRow({ entry, displayCurrency, fxRate, onEdit, onDelete }: P
       </div>
     </div>
   );
-}
+});

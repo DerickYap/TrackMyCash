@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useNetworth, useSettings } from '../../store/AppContext';
 import { EntryUnion, ManualEntry, HoldingEntry } from '../../types/networth';
 import { SummaryStrip } from './SummaryStrip';
@@ -32,18 +32,20 @@ export function NetworthTab() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [groupBy, setGroupBy] = useState<GroupBy>('type');
 
-  const groups: Record<string, EntryUnion[]> = {};
-  for (const e of state.entries) {
-    const key = groupBy === 'type' ? getTypeKey(e) : getAccountKey(e);
-    if (!groups[key]) groups[key] = [];
-    groups[key].push(e);
-  }
+  const { groups, sortedGroups } = useMemo(() => {
+    const g: Record<string, EntryUnion[]> = {};
+    for (const e of state.entries) {
+      const key = groupBy === 'type' ? getTypeKey(e) : getAccountKey(e);
+      if (!g[key]) g[key] = [];
+      g[key].push(e);
+    }
+    const sorted = groupBy === 'type'
+      ? CATEGORY_ORDER.filter(k => g[k]?.length > 0)
+      : Object.keys(g).sort((a, b) => a === 'No Account' ? 1 : b === 'No Account' ? -1 : a.localeCompare(b));
+    return { groups: g, sortedGroups: sorted };
+  }, [state.entries, groupBy]);
 
-  const sortedGroups = groupBy === 'type'
-    ? CATEGORY_ORDER.filter(k => groups[k]?.length > 0)
-    : Object.keys(groups).sort((a, b) => a === 'No Account' ? 1 : b === 'No Account' ? -1 : a.localeCompare(b));
-
-  function handleSave(entry: EntryUnion) {
+  const handleSave = useCallback((entry: EntryUnion) => {
     if (editEntry) {
       dispatch({ type: 'EDIT_ENTRY', payload: entry });
     } else {
@@ -51,17 +53,21 @@ export function NetworthTab() {
     }
     setShowModal(false);
     setEditEntry(undefined);
-  }
+  }, [editEntry, dispatch]);
 
-  function handleEdit(entry: EntryUnion) {
+  const handleEdit = useCallback((entry: EntryUnion) => {
     setEditEntry(entry);
     setShowModal(true);
-  }
+  }, []);
 
-  function handleDeleteConfirm() {
+  const handleDeleteConfirm = useCallback(() => {
     if (deleteId) dispatch({ type: 'DELETE_ENTRY', payload: deleteId });
     setDeleteId(null);
-  }
+  }, [deleteId, dispatch]);
+
+  const handleOpenAdd = useCallback(() => { setEditEntry(undefined); setShowModal(true); }, []);
+  const handleCancelModal = useCallback(() => { setShowModal(false); setEditEntry(undefined); }, []);
+  const handleCancelDelete = useCallback(() => setDeleteId(null), []);
 
   const deleteEntry = deleteId ? state.entries.find(e => e.id === deleteId) : null;
 
@@ -114,18 +120,18 @@ export function NetworthTab() {
             displayCurrency={settings.displayCurrency}
             fxRate={settings.fxRate}
             onEdit={handleEdit}
-            onDelete={id => setDeleteId(id)}
+            onDelete={setDeleteId}
           />
         ))}
       </div>
 
-      <AddEntryFAB onClick={() => { setEditEntry(undefined); setShowModal(true); }} />
+      <AddEntryFAB onClick={handleOpenAdd} />
 
       {showModal && (
         <AddEditEntryModal
           initial={editEntry}
           onSave={handleSave}
-          onCancel={() => { setShowModal(false); setEditEntry(undefined); }}
+          onCancel={handleCancelModal}
         />
       )}
 
@@ -133,7 +139,7 @@ export function NetworthTab() {
         <DeleteConfirmModal
           name={deleteEntry.entryType === 'manual' ? (deleteEntry as ManualEntry).name : (deleteEntry as HoldingEntry).name || (deleteEntry as HoldingEntry).ticker}
           onConfirm={handleDeleteConfirm}
-          onCancel={() => setDeleteId(null)}
+          onCancel={handleCancelDelete}
         />
       )}
     </div>

@@ -23,15 +23,17 @@ export function networthReducer(state: NetworthState, action: NetworthAction): N
       };
     case 'DELETE_ENTRY':
       return { entries: state.entries.filter(e => e.id !== action.payload) };
-    case 'UPDATE_PRICES':
+    case 'UPDATE_PRICES': {
+      const updateMap = new Map(action.payload.map(u => [u.id, u]));
       return {
         entries: state.entries.map(entry => {
           if (entry.entryType !== 'holding') return entry;
-          const update = action.payload.find(u => u.id === entry.id);
+          const update = updateMap.get(entry.id);
           if (!update) return entry;
           return { ...entry, lastPrice: update.lastPrice, lastFetchedAt: update.lastFetchedAt };
         }),
       };
+    }
     default:
       return state;
   }

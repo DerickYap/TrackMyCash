@@ -1,33 +1,31 @@
-import { useState } from 'react';
+import { useState, useMemo, useCallback, memo } from 'react';
 import { Transaction } from '../../types/expense';
 import { useExpense } from '../../store/AppContext';
-import { CATEGORY_KEYWORDS, FALLBACK_CATEGORY } from '../../constants/categoryKeywords';
+import { ALL_CATEGORIES } from '../../constants/categoryKeywords';
 import { formatDate } from '../../utils/formatters';
-
-const ALL_CATEGORIES = [...Object.keys(CATEGORY_KEYWORDS), FALLBACK_CATEGORY];
 
 interface Props {
   transactions: Transaction[];
 }
 
-export function TransactionList({ transactions }: Props) {
+export const TransactionList = memo(function TransactionList({ transactions }: Props) {
   const { dispatch } = useExpense();
   const [search, setSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
 
-  const filtered = transactions.filter(t => {
+  const filtered = useMemo(() => transactions.filter(t => {
     const matchSearch = !search || t.description.toLowerCase().includes(search.toLowerCase());
     const matchCat = !filterCategory || t.category === filterCategory;
     return matchSearch && matchCat;
-  });
+  }), [transactions, search, filterCategory]);
 
-  function updateCategory(t: Transaction, category: string) {
+  const updateCategory = useCallback((t: Transaction, category: string) => {
     dispatch({ type: 'EDIT_CATEGORY', payload: { id: t.id, category } });
     dispatch({
       type: 'SET_CATEGORY_MEMORY',
       payload: { key: `${t.source}:${t.description.toLowerCase().trim()}`, category },
     });
-  }
+  }, [dispatch]);
 
   return (
     <div>
@@ -84,4 +82,4 @@ export function TransactionList({ transactions }: Props) {
       </div>
     </div>
   );
-}
+});

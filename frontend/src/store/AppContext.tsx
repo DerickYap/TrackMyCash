@@ -91,6 +91,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const prevUserIdRef = useRef<string | undefined>(undefined);
 
+  function clearAllLocalStorage() {
+    Object.values(KEYS).forEach(k => localStorage.removeItem(k));
+  }
+
+  // Clear pending debounce timers on unmount to prevent state updates on dead component
+  useEffect(() => () => { Object.values(debounceRef.current).forEach(clearTimeout); }, []);
+
   // Load from Supabase on login
   useEffect(() => {
     if (!user) return;
@@ -130,7 +137,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       expenseDispatch({ type: 'LOAD', payload: { transactions: [], categoryMemory: {} } });
       projectionDispatch({ type: 'LOAD', payload: [] });
       settingsDispatch({ type: 'LOAD', payload: DEFAULT_SETTINGS });
-      Object.values(KEYS).forEach(k => localStorage.removeItem(k));
+      clearAllLocalStorage();
       setCloudSyncState('idle');
       setShowMigrationBanner(false);
     }
@@ -157,7 +164,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }
 
   function dismissMigration() {
-    Object.values(KEYS).forEach(k => localStorage.removeItem(k));
+    clearAllLocalStorage();
     setShowMigrationBanner(false);
   }
 

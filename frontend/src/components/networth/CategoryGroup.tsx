@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo, memo } from 'react';
 import { EntryUnion, Currency } from '../../types/networth';
 import { EntryRow } from './EntryRow';
 import { getEntryValue } from './SummaryStrip';
@@ -26,9 +26,12 @@ interface Props {
   onDelete: (id: string) => void;
 }
 
-export function CategoryGroup({ groupKey, entries, displayCurrency, fxRate, onEdit, onDelete }: Props) {
+export const CategoryGroup = memo(function CategoryGroup({ groupKey, entries, displayCurrency, fxRate, onEdit, onDelete }: Props) {
   const [collapsed, setCollapsed] = useState(false);
-  const total = entries.reduce((sum, e) => sum + getEntryValue(e, displayCurrency, fxRate), 0);
+  const total = useMemo(
+    () => entries.reduce((sum, e) => sum + getEntryValue(e, displayCurrency, fxRate), 0),
+    [entries, displayCurrency, fxRate]
+  );
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -67,4 +70,4 @@ export function CategoryGroup({ groupKey, entries, displayCurrency, fxRate, onEd
       )}
     </div>
   );
-}
+});

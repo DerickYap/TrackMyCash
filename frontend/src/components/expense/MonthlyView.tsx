@@ -3,9 +3,7 @@ import { Transaction } from '../../types/expense';
 import { monthKey, formatMonthYear } from '../../utils/formatters';
 import { ExpenseChart } from './ExpenseChart';
 import { TransactionList } from './TransactionList';
-import { CATEGORY_KEYWORDS, FALLBACK_CATEGORY } from '../../constants/categoryKeywords';
-
-const ALL_CATEGORIES = [...Object.keys(CATEGORY_KEYWORDS), FALLBACK_CATEGORY];
+import { ALL_CATEGORIES } from '../../constants/categoryKeywords';
 
 interface Props {
   transactions: Transaction[];
@@ -24,15 +22,19 @@ export function MonthlyView({ transactions }: Props) {
     [transactions, selectedMonth]
   );
 
-  const debits = monthTransactions.filter(t => t.type === 'debit');
-  const credits = monthTransactions.filter(t => t.type === 'credit');
-  const totalSpend = debits
-    .filter(t => t.category !== 'Transfers & Payments')
-    .reduce((s, t) => s + t.amount, 0);
-  // Exclude transfers & payments from income — CC bill payments are not income
-  const totalIncome = credits
-    .filter(t => t.category !== 'Transfers & Payments')
-    .reduce((s, t) => s + t.amount, 0);
+  const { debits, credits, totalSpend, totalIncome } = useMemo(() => {
+    const d = monthTransactions.filter(t => t.type === 'debit');
+    const c = monthTransactions.filter(t => t.type === 'credit');
+    return {
+      debits: d,
+      credits: c,
+      totalSpend: d.filter(t => t.category !== 'Transfers & Payments').reduce((s, t) => s + t.amount, 0),
+      // Exclude transfers & payments from income — CC bill payments are not income
+      totalIncome: c.filter(t => t.category !== 'Transfers & Payments').reduce((s, t) => s + t.amount, 0),
+    };
+  }, [monthTransactions]);
+
+  const net = totalIncome - totalSpend;
 
   const chartData = useMemo(() => {
     const cats: Record<string, number> = {};
@@ -74,8 +76,8 @@ export function MonthlyView({ transactions }: Props) {
         </div>
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <div className="text-xs text-gray-400 mb-1">Net</div>
-          <div className={`text-lg font-semibold ${totalIncome - totalSpend >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-            S${(totalIncome - totalSpend).toFixed(2)}
+          <div className={`text-lg font-semibold ${net >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+            S${net.toFixed(2)}
           </div>
         </div>
       </div>

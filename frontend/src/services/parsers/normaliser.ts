@@ -3,6 +3,11 @@ import { Currency } from '../../types/networth';
 import { assignCategory } from '../../utils/categoriser';
 import { buildDuplicateSet, isDuplicate } from '../../utils/duplicateDetector';
 
+const MONTH_MAP: Record<string, string> = {
+  jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
+  jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12',
+};
+
 function normaliseDate(raw: string): string {
   // Handles: DD MMM YYYY, MM/DD/YYYY, DD/MM/YYYY, YYYY-MM-DD
   raw = raw.trim();
@@ -13,11 +18,7 @@ function normaliseDate(raw: string): string {
   // DD MMM YYYY  e.g. 15 Jan 2025
   const dmy = raw.match(/^(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})$/);
   if (dmy) {
-    const months: Record<string, string> = {
-      jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
-      jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12',
-    };
-    const m = months[dmy[2].toLowerCase()];
+    const m = MONTH_MAP[dmy[2].toLowerCase()];
     return `${dmy[3]}-${m}-${dmy[1].padStart(2, '0')}`;
   }
 

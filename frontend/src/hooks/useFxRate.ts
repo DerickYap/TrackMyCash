@@ -14,5 +14,6 @@ export function useFxRate() {
         });
       }
     });
-  }, []); // only on mount
+  // Re-run when fxFetchedAt resets (e.g. after logout/login) or source switches from manual
+  }, [state.fxFetchedAt, state.fxSource]); // eslint-disable-line react-hooks/exhaustive-deps
 }

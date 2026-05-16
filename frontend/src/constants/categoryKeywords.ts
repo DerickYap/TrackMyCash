@@ -46,3 +46,5 @@ export const CATEGORY_KEYWORDS: Record<string, string[]> = {
 };
 
 export const FALLBACK_CATEGORY = 'Others';
+
+export const ALL_CATEGORIES = [...Object.keys(CATEGORY_KEYWORDS), FALLBACK_CATEGORY];
